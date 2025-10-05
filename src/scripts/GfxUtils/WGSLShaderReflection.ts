@@ -4,13 +4,14 @@ import { ComputeBindingMapping } from "babylonjs";
  * WGSL Shader Reflection 工具类
  * 用于自动从 WGSL 代码中提取 binding mappings 信息和默认值
  */
-export class WGSLShaderReflection {
+export class WGSLShaderReflection 
+{
     /**
      * 从 WGSL 代码中提取 binding mappings
      * @param wgslSource WGSL 源代码
      * @returns binding mappings 对象
      */
-    public static extractBindings(wgslSource: string): Record<string, { group: number; binding: number }> {
+    public static ExtractBindings(wgslSource: string): Record<string, { group: number; binding: number }> {
         const bindings: Record<string, { group: number; binding: number }> = {};
         
         // 匹配 @group(X) @binding(Y) var name: type; 模式
@@ -47,7 +48,7 @@ export class WGSLShaderReflection {
      * @param wgslSource WGSL 源代码
      * @returns uniform 默认值对象
      */
-    public static extractUniformDefaults(wgslSource: string): Record<string, any> {
+    public static ExtractUniformDefaults(wgslSource: string): Record<string, any> {
         const defaults: Record<string, any> = {};
         
         // 匹配 // @default fieldName: value 格式的注释
@@ -104,7 +105,7 @@ export class WGSLShaderReflection {
      * @param wgslSource WGSL 源代码
      * @returns uniform 结构体信息
      */
-    public static extractUniformStruct(wgslSource: string): {
+    public static ExtractUniformStruct(wgslSource: string): {
         structName: string;
         fields: Array<{
             name: string;
@@ -139,7 +140,7 @@ export class WGSLShaderReflection {
         }
         
         // 提取默认值
-        const defaults = this.extractUniformDefaults(wgslSource);
+        const defaults = this.ExtractUniformDefaults(wgslSource);
         
         // 将默认值分配给对应字段
         fields.forEach(field => {
@@ -159,8 +160,8 @@ export class WGSLShaderReflection {
      * @param wgslSource WGSL 源代码
      * @returns 初始化代码字符串
      */
-    public static generateUniformBufferInit(wgslSource: string): string {
-        const structInfo = this.extractUniformStruct(wgslSource);
+    public static GenerateUniformBufferInit(wgslSource: string): string {
+        const structInfo = this.ExtractUniformStruct(wgslSource);
         if (!structInfo) {
             return '// 未找到 uniform 结构体';
         }
@@ -202,8 +203,8 @@ export class WGSLShaderReflection {
      * @param wgslSource WGSL 源代码
      * @returns TypeScript 接口字符串
      */
-    public static generateTypeScriptInterface(wgslSource: string): string {
-        const structInfo = this.extractUniformStruct(wgslSource);
+    public static GenerateTypeScriptInterface(wgslSource: string): string {
+        const structInfo = this.ExtractUniformStruct(wgslSource);
         if (!structInfo) {
             return '// 未找到 uniform 结构体';
         }
@@ -238,13 +239,13 @@ export class WGSLShaderReflection {
      * @param bindings 要验证的 binding mappings
      * @returns 验证结果
      */
-    public static validateBindings(wgslSource: string, bindings: Record<string, { group: number; binding: number }>): {
+    public static ValidateBindings(wgslSource: string, bindings: Record<string, { group: number; binding: number }>): {
         isValid: boolean;
         missing: string[];
         extra: string[];
         conflicts: Array<{ name: string; expected: { group: number; binding: number }; actual: { group: number; binding: number } }>;
     } {
-        const extractedBindings = this.extractBindings(wgslSource);
+        const extractedBindings = this.ExtractBindings(wgslSource);
         const missing: string[] = [];
         const extra: string[] = [];
         const conflicts: Array<{ name: string; expected: { group: number; binding: number }; actual: { group: number; binding: number } }> = [];
@@ -282,7 +283,7 @@ export class WGSLShaderReflection {
      * @param wgslSource WGSL 源代码
      * @returns 资源类型信息
      */
-    public static extractResourceTypes(wgslSource: string): Array<{
+    public static ExtractResourceTypes(wgslSource: string): Array<{
         name: string;
         group: number;
         binding: number;
@@ -339,8 +340,8 @@ export class WGSLShaderReflection {
      * @param wgslSource WGSL 源代码
      * @returns Babylon.js 格式的 bindings 配置
      */
-    public static generateBabylonComputeBindings(wgslSource: string): ComputeBindingMapping {
-        const bindings = this.extractBindings(wgslSource);
+    public static GenerateBabylonComputeBindings(wgslSource: string): ComputeBindingMapping {
+        const bindings = this.ExtractBindings(wgslSource);
         const computeBindings: ComputeBindingMapping = {};
         for (const [name, binding] of Object.entries(bindings)) {
             computeBindings[name] = {
@@ -352,15 +353,212 @@ export class WGSLShaderReflection {
     }
     
     /**
+     * 从 WGSL 代码中提取 Compute EntryPoint 信息
+     * @param wgslSource WGSL 源代码
+     * @returns Compute EntryPoint 信息数组
+     */
+    public static ExtractComputeEntryPoints(wgslSource: string): Array<{
+        name: string;
+        workgroupSize: {
+            x: number;
+            y: number;
+            z: number;
+        };
+        workgroupSizeConstants: {
+            x?: string;
+            y?: string;
+            z?: string;
+        };
+        parameters: Array<{
+            name: string;
+            type: string;
+            builtin?: string;
+        }>;
+    }> {
+        const entryPoints: Array<{
+            name: string;
+            workgroupSize: {
+                x: number;
+                y: number;
+                z: number;
+            };
+            workgroupSizeConstants: {
+                x?: string;
+                y?: string;
+                z?: string;
+            };
+            parameters: Array<{
+                name: string;
+                type: string;
+                builtin?: string;
+            }>;
+        }> = [];
+
+        // 匹配 compute entrypoint 函数
+        // 格式: @compute @workgroup_size(X, Y, Z) fn functionName(...) { ... }
+        const computeRegex = /@compute\s+@workgroup_size\(([^)]+)\)\s*\n\s*fn\s+(\w+)/gs;
+        let match;
+
+        while ((match = computeRegex.exec(wgslSource)) !== null) {
+            const workgroupSizeStr = match[1].trim();
+            const functionName = match[2];
+
+            // 解析 workgroup size
+            const workgroupSizeParts = workgroupSizeStr.split(',').map(p => p.trim());
+            const workgroupSize = {
+                x: this.parseWorkgroupSizeValue(workgroupSizeParts[0], wgslSource),
+                y: this.parseWorkgroupSizeValue(workgroupSizeParts[1], wgslSource),
+                z: this.parseWorkgroupSizeValue(workgroupSizeParts[2], wgslSource)
+            };
+
+            // 解析 workgroup size 常量名
+            const workgroupSizeConstants = {
+                x: this.extractWorkgroupSizeConstant(workgroupSizeParts[0]),
+                y: this.extractWorkgroupSizeConstant(workgroupSizeParts[1]),
+                z: this.extractWorkgroupSizeConstant(workgroupSizeParts[2])
+            };
+
+            // 尝试从完整匹配中提取参数信息
+            const fullMatch = match[0];
+            const paramMatch = fullMatch.match(/fn\s+\w+\s*\(([^)]*)\)/);
+            const parametersStr = paramMatch ? paramMatch[1].trim() : '';
+
+            // 解析函数参数
+            const parameters: Array<{ name: string; type: string; builtin?: string }> = [];
+            if (parametersStr) {
+                const paramRegex = /@builtin\((\w+)\)\s+(\w+):\s*([^,]+)/g;
+                let paramMatch;
+                while ((paramMatch = paramRegex.exec(parametersStr)) !== null) {
+                    parameters.push({
+                        name: paramMatch[2],
+                        type: paramMatch[3].trim(),
+                        builtin: paramMatch[1]
+                    });
+                }
+            }
+
+            entryPoints.push({
+                name: functionName,
+                workgroupSize,
+                workgroupSizeConstants,
+                parameters
+            });
+        }
+
+        return entryPoints;
+    }
+
+    /**
+     * 解析 workgroup size 值（支持常量和数字）
+     * @param valueStr 值字符串
+     * @param wgslSource WGSL 源代码
+     * @returns 解析后的数值
+     */
+    private static parseWorkgroupSizeValue(valueStr: string, wgslSource: string): number {
+        // 如果是数字，直接返回
+        if (!isNaN(Number(valueStr))) {
+            return Number(valueStr);
+        }
+
+        // 如果是常量，尝试从源代码中查找常量定义
+        const constRegex = new RegExp(`const\\s+${valueStr}\\s*=\\s*(\\d+)u?;`, 'g');
+        const match = constRegex.exec(wgslSource);
+        if (match) {
+            return parseInt(match[1]);
+        }
+
+        // 默认返回 1
+        return 1;
+    }
+
+    /**
+     * 提取 workgroup size 常量名
+     * @param valueStr 值字符串
+     * @returns 常量名（如果是常量）或 undefined
+     */
+    private static extractWorkgroupSizeConstant(valueStr: string): string | undefined {
+        // 如果是数字，返回 undefined
+        if (!isNaN(Number(valueStr))) {
+            return undefined;
+        }
+
+        // 如果是常量名，返回常量名
+        return valueStr;
+    }
+
+    /**
+     * 从 WGSL 代码中提取所有常量定义
+     * @param wgslSource WGSL 源代码
+     * @returns 常量定义对象
+     */
+    public static ExtractConstants(wgslSource: string): Record<string, number> {
+        const constants: Record<string, number> = {};
+        
+        // 匹配 const 定义
+        const constRegex = /const\s+(\w+)\s*=\s*(\d+)u?;/g;
+        let match;
+        
+        while ((match = constRegex.exec(wgslSource)) !== null) {
+            const name = match[1];
+            const value = parseInt(match[2]);
+            constants[name] = value;
+        }
+        
+        return constants;
+    }
+
+    /**
+     * 生成 Compute EntryPoint 的调试信息
+     * @param wgslSource WGSL 源代码
+     * @returns 调试信息字符串
+     */
+    public static GenerateComputeDebugInfo(wgslSource: string): string {
+        const entryPoints = this.ExtractComputeEntryPoints(wgslSource);
+        const constants = this.ExtractConstants(wgslSource);
+        
+        let debugInfo = '=== WGSL Compute EntryPoints Debug Info ===\n\n';
+        
+        debugInfo += 'Constants:\n';
+        for (const [name, value] of Object.entries(constants)) {
+            debugInfo += `  ${name} = ${value}\n`;
+        }
+        
+        debugInfo += '\nCompute EntryPoints:\n';
+        entryPoints.forEach((entryPoint, index) => {
+            debugInfo += `  ${index + 1}. ${entryPoint.name}\n`;
+            debugInfo += `     Workgroup Size: ${entryPoint.workgroupSize.x} x ${entryPoint.workgroupSize.y} x ${entryPoint.workgroupSize.z}\n`;
+            
+            if (entryPoint.workgroupSizeConstants.x || entryPoint.workgroupSizeConstants.y || entryPoint.workgroupSizeConstants.z) {
+                debugInfo += `     Workgroup Size Constants:\n`;
+                if (entryPoint.workgroupSizeConstants.x) debugInfo += `       X: ${entryPoint.workgroupSizeConstants.x}\n`;
+                if (entryPoint.workgroupSizeConstants.y) debugInfo += `       Y: ${entryPoint.workgroupSizeConstants.y}\n`;
+                if (entryPoint.workgroupSizeConstants.z) debugInfo += `       Z: ${entryPoint.workgroupSizeConstants.z}\n`;
+            }
+            
+            if (entryPoint.parameters.length > 0) {
+                debugInfo += `     Parameters:\n`;
+                entryPoint.parameters.forEach(param => {
+                    const builtinInfo = param.builtin ? ` (@builtin(${param.builtin}))` : '';
+                    debugInfo += `       ${param.name}: ${param.type}${builtinInfo}\n`;
+                });
+            }
+            
+            debugInfo += '\n';
+        });
+        
+        return debugInfo;
+    }
+
+    /**
      * 生成调试信息
      * @param wgslSource WGSL 源代码
      * @returns 调试信息字符串
      */
-    public static generateDebugInfo(wgslSource: string): string {
-        const bindings = this.extractBindings(wgslSource);
-        const resources = this.extractResourceTypes(wgslSource);
-        const defaults = this.extractUniformDefaults(wgslSource);
-        const structInfo = this.extractUniformStruct(wgslSource);
+    public static GenerateDebugInfo(wgslSource: string): string {
+        const bindings = this.ExtractBindings(wgslSource);
+        const resources = this.ExtractResourceTypes(wgslSource);
+        const defaults = this.ExtractUniformDefaults(wgslSource);
+        const structInfo = this.ExtractUniformStruct(wgslSource);
         
         let debugInfo = '=== WGSL Shader Reflection Debug Info ===\n\n';
         
@@ -388,7 +586,7 @@ export class WGSLShaderReflection {
             debugInfo += `  Name: ${structInfo.structName}\n`;
             debugInfo += '  Fields:\n';
             structInfo.fields.forEach(field => {
-                const defaultValue = field.defaultValue !== undefined ? ` (default: ${JSON.stringify(field.defaultValue)})` : '';
+                const defaultValue = field.defaultValue !== undefined ? ` (default: ${JSON.stringify(field.defaultValue)})` : ''; 
                 debugInfo += `    ${field.name}: ${field.type}${defaultValue}\n`;
             });
         }

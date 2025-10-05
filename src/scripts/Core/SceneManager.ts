@@ -4,11 +4,15 @@ export class SceneManager {
     public scene: BABYLON.Scene;
     public camera: BABYLON.FreeCamera;
     public plane: BABYLON.Mesh;
+    public material!: BABYLON.StandardMaterial;
 
-    constructor(private engine: BABYLON.Engine, private canvas: HTMLCanvasElement) {
+    constructor(private engine: BABYLON.Engine, private canvas: HTMLCanvasElement) 
+    {
         this.scene = this.createScene();
         this.camera = this.createCamera();
         this.plane = this.createPlane();
+        this.material = this.createMaterial();
+        this.plane.material = this.material;
     }
 
     private createScene(): BABYLON.Scene {
@@ -44,7 +48,26 @@ export class SceneManager {
         return plane;
     }
 
-    public render(): void {
+    private createMaterial(): BABYLON.StandardMaterial 
+    {
+        const material = new BABYLON.StandardMaterial("videoMaterial", this.scene);
+        material.diffuseColor = new BABYLON.Color3(1, 1, 1);
+        material.emissiveColor = new BABYLON.Color3(1, 1, 1);
+        
+        // 启用透明度
+        material.alpha = 1.0;
+        
+        // 设置材质属性
+        material.backFaceCulling = false;
+        material.twoSidedLighting = true;
+
+        return material;
+    }
+
+    public render(mainTexture: BABYLON.Texture): void 
+    {
+        this.material.diffuseTexture = mainTexture;
+        this.material.emissiveTexture = mainTexture;
         this.scene.render();
     }
 

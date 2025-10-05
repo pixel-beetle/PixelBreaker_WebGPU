@@ -1,24 +1,13 @@
-import { ShaderUniforms } from './ShaderManager';
-
 export class UIManager {
     private controlPanel!: HTMLElement;
-    private uniforms: ShaderUniforms;
     private isMuted: boolean = false;
     private volume: number = 1.0;
 
     constructor(
-        private onUniformsChange: (uniforms: ShaderUniforms) => void,
         private onPlayPause: () => void,
         private onVolumeChange: (volume: number) => void,
         private onMuteToggle: () => void
     ) {
-        this.uniforms = {
-            brightness: 0.0,
-            contrast: 1.0,
-            saturation: 1.0,
-            hueShift: 0.0,
-            gamma: 1.0
-        };
         this.setupUI();
     }
 
@@ -64,36 +53,6 @@ export class UIManager {
         mediaQuery.addEventListener('change', handleResponsive);
         handleResponsive(mediaQuery); // 初始化
 
-        // 亮度控制
-        const brightnessDiv = this.createSliderControl('亮度', this.uniforms.brightness, -1, 1, (value) => {
-            this.uniforms.brightness = value;
-            this.onUniformsChange(this.uniforms);
-        });
-
-        // 对比度控制
-        const contrastDiv = this.createSliderControl('对比度', this.uniforms.contrast, 0, 2, (value) => {
-            this.uniforms.contrast = value;
-            this.onUniformsChange(this.uniforms);
-        });
-
-        // 饱和度控制
-        const saturationDiv = this.createSliderControl('饱和度', this.uniforms.saturation, 0, 2, (value) => {
-            this.uniforms.saturation = value;
-            this.onUniformsChange(this.uniforms);
-        });
-
-        // 色相控制
-        const hueDiv = this.createSliderControl('色相', this.uniforms.hueShift, -1, 1, (value) => {
-            this.uniforms.hueShift = value;
-            this.onUniformsChange(this.uniforms);
-        });
-
-        // 伽马控制
-        const gammaDiv = this.createSliderControl('伽马', this.uniforms.gamma, 0.1, 3, (value) => {
-            this.uniforms.gamma = value;
-            this.onUniformsChange(this.uniforms);
-        });
-
         // 音量控制
         const volumeDiv = this.createSliderControl('音量', this.volume, 0, 1, (value) => {
             this.volume = value;
@@ -131,11 +90,6 @@ export class UIManager {
             playButton.style.background = '#007acc';
         };
 
-        this.controlPanel.appendChild(brightnessDiv);
-        this.controlPanel.appendChild(contrastDiv);
-        this.controlPanel.appendChild(saturationDiv);
-        this.controlPanel.appendChild(hueDiv);
-        this.controlPanel.appendChild(gammaDiv);
         this.controlPanel.appendChild(volumeDiv);
         this.controlPanel.appendChild(muteButton);
         this.controlPanel.appendChild(playButton);
