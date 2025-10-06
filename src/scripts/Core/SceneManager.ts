@@ -1,36 +1,37 @@
 import * as BABYLON from 'babylonjs';
 
-export class SceneManager {
+
+export class SceneManager 
+{
     public scene: BABYLON.Scene;
     public camera: BABYLON.FreeCamera;
     public plane: BABYLON.Mesh;
-    public material!: BABYLON.StandardMaterial;
 
     constructor(private engine: BABYLON.Engine, private canvas: HTMLCanvasElement) 
     {
         this.scene = this.createScene();
         this.camera = this.createCamera();
         this.plane = this.createPlane();
-        this.material = this.createMaterial();
-        this.plane.material = this.material;
     }
 
-    private createScene(): BABYLON.Scene {
+    private createScene(): BABYLON.Scene 
+    {
         const scene = new BABYLON.Scene(this.engine);
         scene.clearColor = new BABYLON.Color4(0, 0, 0, 1);
         return scene;
     }
 
-    private createCamera(): BABYLON.FreeCamera {
-        const camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(0, 0, -5), this.scene);
+    private createCamera(): BABYLON.FreeCamera 
+    {
+        const camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(0, 0, -8), this.scene);
         camera.setTarget(BABYLON.Vector3.Zero());
-        // 禁用鼠标控制
-        camera.detachControl();
+        camera.attachControl(this.canvas, true);
         return camera;
     }
 
-    private createPlane(): BABYLON.Mesh {
-        const plane = BABYLON.MeshBuilder.CreatePlane("videoPlane", {
+    private createPlane(): BABYLON.Mesh 
+    {
+        const plane = BABYLON.MeshBuilder.CreatePlane("RenderPlane", {
             width: 10,
             height: 10 * (9/16) // 16:9 宽高比
         }, this.scene);
@@ -48,30 +49,15 @@ export class SceneManager {
         return plane;
     }
 
-    private createMaterial(): BABYLON.StandardMaterial 
-    {
-        const material = new BABYLON.StandardMaterial("videoMaterial", this.scene);
-        material.diffuseColor = new BABYLON.Color3(1, 1, 1);
-        material.emissiveColor = new BABYLON.Color3(1, 1, 1);
-        
-        // 启用透明度
-        material.alpha = 1.0;
-        
-        // 设置材质属性
-        material.backFaceCulling = false;
-        material.twoSidedLighting = true;
 
-        return material;
-    }
-
-    public render(mainTexture: BABYLON.Texture): void 
+    public render(renderMaterial: BABYLON.ShaderMaterial): void 
     {
-        this.material.diffuseTexture = mainTexture;
-        this.material.emissiveTexture = mainTexture;
+        this.plane.material = renderMaterial;
         this.scene.render();
     }
 
-    public dispose(): void {
+    public dispose(): void 
+    {
         this.scene.dispose();
     }
 }

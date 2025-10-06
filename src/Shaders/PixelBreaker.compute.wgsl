@@ -1,5 +1,10 @@
 
-
+fn Hash(input: u32) -> u32 
+{
+    var state = input * 747796405u + 2891336453u;
+    var word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
 
 
 fn TransformID_2To1_UInt(id: vec2<u32>, size: vec2<u32>) -> u32 
@@ -30,20 +35,19 @@ fn TransformID_1ToUV(id: u32, size: vec2<u32>) -> vec2<f32>
 
 fn PackColor(color: vec4<f32>) -> u32
 {
-    return (u32(color.a * 255.0) << 24)
-            | (u32(color.b * 255.0) << 16)
-            | (u32(color.g * 255.0) << 8)
-            | (u32(color.r * 255.0));
+    return (u32(color.r * 255.0)) |
+            (u32(color.g * 255.0) << 8) |
+            (u32(color.b * 255.0) << 16) |
+            (u32(color.a * 255.0) << 24);
 }
 
-fn UnpackColor(color: u32) -> vec4<f32>
+fn UnpackColor(packed: u32) -> vec4<f32>
 {
-    return vec4<f32>(
-        f32((color & 0x000000FF) >> 0) / 255.0,
-        f32((color & 0x0000FF00) >> 8) / 255.0,
-        f32((color & 0x00FF0000) >> 16) / 255.0,
-        f32((color & 0xFF000000) >> 24) / 255.0
-    );
+    let r = f32((packed >>  0) & 0xFFu) / 255.0;
+    let g = f32((packed >>  8) & 0xFFu) / 255.0;
+    let b = f32((packed >> 16) & 0xFFu) / 255.0;
+    let a = f32((packed >> 24) & 0xFFu) / 255.0;
+    return vec4<f32>(r, g, b, a);
 }
 
 
@@ -67,6 +71,8 @@ const PACKED_PARTICLE_STATE_SIZE = 5;
 
 struct Uniforms
 {
+    _Time: f32,
+    _DeltaTime: f32,
     _RenderTargetTexelSize: vec4<f32>,
     _TotalParticleCapacity: u32,
     _DynamicParticleInitialCount: u32,
@@ -79,28 +85,31 @@ struct Uniforms
 
 @group(0) @binding(0) var<uniform> _Uniforms: Uniforms;
 
-@group(0) @binding(1) var<storage, read> _ParticleMemoryBuffer_R: array<u32>;
+@group(0) @binding(1) var<storage, read>       _ParticleMemoryBuffer_R: array<u32>;
 @group(0) @binding(2) var<storage, read_write> _ParticleMemoryBuffer_RW: array<u32>;
 
-@group(0) @binding(3) var<storage, read_write> _ParticleActivateStateBuffer_R: array<atomic<u32>>;
+@group(0) @binding(3) var<storage, read>       _ParticleActivateStateBuffer_R: array<u32>;
 @group(0) @binding(4) var<storage, read_write> _ParticleActivateStateBuffer_RW: array<atomic<u32>>;
 
-@group(0) @binding(5) var<storage, read_write> _ParticleCountBuffer_R: array<atomic<u32>>;
+@group(0) @binding(5) var<storage, read>       _ParticleCountBuffer_R: array<u32>;
 @group(0) @binding(6) var<storage, read_write> _ParticleCountBuffer_RW: array<atomic<u32>>;
 
-@group(0) @binding(7) var<storage, read_write> _ParticleConvertCandidateBuffer_RW: array<u32>;
+@group(0) @binding(7) var<storage, read>       _ActiveDynamicParticleSlotIndexBuffer_R: array<u32>;
+@group(0) @binding(8) var<storage, read_write> _ActiveDynamicParticleSlotIndexBuffer_RW: array<u32>;
 
-@group(0) @binding(8) var<storage, read_write> _RasterTargetBuffer_R: array<atomic<u32>>;
-@group(0) @binding(9) var<storage, read_write> _RasterTargetBuffer_RW: array<atomic<u32>>;
+@group(0) @binding(9) var<storage, read>        _ActiveStaticParticleSlotIndexBuffer_R: array<u32>;
+@group(0) @binding(10) var<storage, read_write> _ActiveStaticParticleSlotIndexBuffer_RW: array<u32>;
 
-@group(0) @binding(10) var<storage, read_write> _IndirectDispatchArgsBuffer_UpdateDynamicParticles_RW: array<u32>;
-@group(0) @binding(11) var<storage, read_write> _IndirectDispatchArgsBuffer_ConvertStaticParticles_RW: array<u32>;
-@group(0) @binding(12) var<storage, read_write> _IndirectDispatchArgsBuffer_RasterizeParticles_RW: array<u32>;
+@group(0) @binding(11) var<storage, read>       _RasterTargetBuffer_R: array<u32>;
+@group(0) @binding(12) var<storage, read_write> _RasterTargetBuffer_RW: array<atomic<u32>>;
+
+@group(0) @binding(13) var<storage, read_write> _IndirectDispatchArgsBuffer_RW: array<u32>;
 
 
-const PARTICLE_ACTIVATE_STATE_STATIC = 0u;
-const PARTICLE_ACTIVATE_STATE_PRE_DYNAMIC = 1u;
-const PARTICLE_ACTIVATE_STATE_DYNAMIC = 2u;
+const PARTICLE_ACTIVATE_STATE_UNINITIALIZED = 0u;
+const PARTICLE_ACTIVATE_STATE_STATIC = 1u;
+const PARTICLE_ACTIVATE_STATE_PRE_DYNAMIC = 2u;
+const PARTICLE_ACTIVATE_STATE_DYNAMIC = 3u;
 
 fn GetTotalParticleCapacity() -> u32
 {
@@ -109,48 +118,34 @@ fn GetTotalParticleCapacity() -> u32
 
 fn GetPrevDynamicParticleCount() -> u32
 {
-    return atomicLoad(&_ParticleCountBuffer_R[0]);
+    return _ParticleCountBuffer_R[0];
 }
 
 fn GetCurrentDynamicParticleCount() -> u32
 {
-    return atomicLoad(&_ParticleCountBuffer_RW[0]);
+    return atomicLoad(&(_ParticleCountBuffer_RW[0]));
 }
 
-fn IncrementDynamicParticleCount()
+fn IncrementDynamicParticleCount() -> u32
 {
-    atomicAdd(&_ParticleCountBuffer_RW[0], 1u);
+    return atomicAdd(&(_ParticleCountBuffer_RW[0]), 1u);
 }
 
 fn GetPrevStaticParticleCount() -> u32
 {
-    return atomicLoad(&_ParticleCountBuffer_R[1]);
+    return _ParticleCountBuffer_R[1];
 }
 
 fn GetCurrentStaticParticleCount() -> u32
 {
-    return atomicLoad(&_ParticleCountBuffer_RW[1]);
+    return atomicLoad(&(_ParticleCountBuffer_RW[1]));
 }
 
-fn IncrementStaticParticleCount()
+fn IncrementStaticParticleCount() -> u32
 {
-    atomicAdd(&_ParticleCountBuffer_RW[1], 1u);
+    return atomicAdd(&(_ParticleCountBuffer_RW[1]), 1u);
 }
 
-fn GetPrevConvertCandidateParticleCount() -> u32
-{
-    return atomicLoad(&_ParticleCountBuffer_R[2]);
-}
-
-fn GetCurrentConvertCandidateParticleCount() -> u32
-{
-    return atomicLoad(&_ParticleCountBuffer_RW[2]);
-}
-
-fn IncrementConvertCandidateParticleCount()
-{
-    atomicAdd(&_ParticleCountBuffer_RW[2], 1u);
-}
 
 fn UnpackParticleState(packedParticleState: PackedParticleState) -> ParticleState
 {
@@ -177,7 +172,7 @@ fn ReadPrevParticleState(id: u32) -> ParticleState
     packedParticleState.packedPosition.y = bitcast<f32>(_ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE + 1]);
     packedParticleState.packedVelocity.x = bitcast<f32>(_ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE + 2]);
     packedParticleState.packedVelocity.y = bitcast<f32>(_ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE + 3]);
-    packedParticleState.packedColor = _ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE + 2];
+    packedParticleState.packedColor =                   _ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE + 4];
     return UnpackParticleState(packedParticleState);
 }
 
@@ -198,31 +193,12 @@ fn WriteParticleActivateState(id: u32, particleActivateState: u32)
 
 fn ReadPrevParticleActivateState(id: u32) -> u32
 {
-    return atomicLoad(&_ParticleActivateStateBuffer_R[id]);
+    return _ParticleActivateStateBuffer_R[id];
 }
 
 fn AtomicMarkParticlePreDynamicCandidate(id: u32)
 {
-    let compareExchangeResult = atomicCompareExchangeWeak(&_ParticleActivateStateBuffer_RW[id], PARTICLE_ACTIVATE_STATE_STATIC, PARTICLE_ACTIVATE_STATE_PRE_DYNAMIC);
-    if (compareExchangeResult.exchanged)
-    {
-        let candidateIndex = atomicAdd(&_ParticleCountBuffer_RW[1], 1u);
-        if (candidateIndex >= _Uniforms._TotalParticleCapacity)
-        {
-            return;
-        }
-        _ParticleConvertCandidateBuffer_RW[candidateIndex] = id;
-    }
-}
-
-fn MarkParticleStatic(id: u32)
-{
-    atomicStore(&_ParticleActivateStateBuffer_RW[id], PARTICLE_ACTIVATE_STATE_STATIC);
-}
-
-fn MarkParticleDynamic(id: u32)
-{
-    atomicStore(&_ParticleActivateStateBuffer_RW[id], PARTICLE_ACTIVATE_STATE_DYNAMIC);
+    atomicCompareExchangeWeak(&_ParticleActivateStateBuffer_RW[id], PARTICLE_ACTIVATE_STATE_STATIC, PARTICLE_ACTIVATE_STATE_PRE_DYNAMIC);
 }
 
 
@@ -236,21 +212,73 @@ fn InitialFillParticleCountBuffer(@builtin(global_invocation_id) globalId: vec3<
         return;
     }
 
-    let staticParticleSpawnRectMinMax = _Uniforms._StaticParticleSpawnRectMinMax;
-    let staticParticleSpawnWidth = u32(staticParticleSpawnRectMinMax.z - staticParticleSpawnRectMinMax.x);
-    let staticParticleSpawnHeight = u32(staticParticleSpawnRectMinMax.w - staticParticleSpawnRectMinMax.y);
-    let staticParticleSpawnCount = staticParticleSpawnWidth * staticParticleSpawnHeight;
+    atomicStore(&_ParticleCountBuffer_RW[0], 0u);
+    atomicStore(&_ParticleCountBuffer_RW[1], 0u);
+    atomicStore(&_ParticleCountBuffer_RW[2], 0u);
 
-    atomicStore(&_ParticleCountBuffer_RW[0], _Uniforms._DynamicParticleInitialCount);
-    atomicStore(&_ParticleCountBuffer_RW[1], staticParticleSpawnCount);
+    _IndirectDispatchArgsBuffer_RW[0] = 0u;
+    _IndirectDispatchArgsBuffer_RW[1] = 0u;
+    _IndirectDispatchArgsBuffer_RW[2] = 0u;
+    _IndirectDispatchArgsBuffer_RW[3] = 0u;
+    _IndirectDispatchArgsBuffer_RW[4] = 0u;
+    _IndirectDispatchArgsBuffer_RW[5] = 0u;
+    _IndirectDispatchArgsBuffer_RW[6] = 0u;
+    _IndirectDispatchArgsBuffer_RW[7] = 0u;
+    _IndirectDispatchArgsBuffer_RW[8] = 0u;
+    _IndirectDispatchArgsBuffer_RW[9] = 0u;
+    _IndirectDispatchArgsBuffer_RW[10] = 0u;
+    _IndirectDispatchArgsBuffer_RW[11] = 0u;
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn ClearParticleCounter(@builtin(global_invocation_id) globalId: vec3<u32>)
+{
+    if (globalId.x != 0u)
+    {
+        return;
+    }
+    
+    atomicStore(&_ParticleCountBuffer_RW[0], 0u);
+    atomicStore(&_ParticleCountBuffer_RW[1], 0u);
     atomicStore(&_ParticleCountBuffer_RW[2], 0u);
 }
 
+@compute @workgroup_size(1, 1, 1)
+fn FillIndirectArgs(@builtin(global_invocation_id) globalId: vec3<u32>)
+{
+    if (globalId.x != 0u)
+    {
+        return;
+    }
+
+    let currentDynamicParticleCount = GetCurrentDynamicParticleCount();
+    let currentStaticParticleCount = GetCurrentStaticParticleCount();
+
+    // Dynamic Particle Update Indirect Args
+    _IndirectDispatchArgsBuffer_RW[0] = (currentDynamicParticleCount + THREAD_GROUP_SIZE_X - 1u) / THREAD_GROUP_SIZE_X;
+    _IndirectDispatchArgsBuffer_RW[1] = 1;
+    _IndirectDispatchArgsBuffer_RW[2] = 1;
+    
+    // Static Particle Update Indirect Args
+    _IndirectDispatchArgsBuffer_RW[3] = (currentStaticParticleCount + THREAD_GROUP_SIZE_X - 1u) / THREAD_GROUP_SIZE_X;
+    _IndirectDispatchArgsBuffer_RW[4] = 1;
+    _IndirectDispatchArgsBuffer_RW[5] = 1;
+    
+    // Rasterize Static Particles Indirect Args
+    _IndirectDispatchArgsBuffer_RW[6] = (currentStaticParticleCount + THREAD_GROUP_SIZE_X - 1u) / THREAD_GROUP_SIZE_X;
+    _IndirectDispatchArgsBuffer_RW[7] = 1;
+    _IndirectDispatchArgsBuffer_RW[8] = 1;
+
+    // Rasterize Dynamic Particles Indirect Args
+    _IndirectDispatchArgsBuffer_RW[9] = (currentDynamicParticleCount + THREAD_GROUP_SIZE_X - 1u) / THREAD_GROUP_SIZE_X;
+    _IndirectDispatchArgsBuffer_RW[10] = 1;
+    _IndirectDispatchArgsBuffer_RW[11] = 1;
+}
 
 @compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
 fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
 {
-    let particleID = globalId.x;
+    let particleSlotID = globalId.x;
 
     let staticParticleSpawnRectMinMax = _Uniforms._StaticParticleSpawnRectMinMax;
     let staticParticleSpawnWidth = u32(staticParticleSpawnRectMinMax.z - staticParticleSpawnRectMinMax.x);
@@ -258,12 +286,12 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     let staticParticleSpawnCount = staticParticleSpawnWidth * staticParticleSpawnHeight;
 
     let totalSpawnCount = staticParticleSpawnCount + _Uniforms._DynamicParticleInitialCount;
-    if (particleID >= totalSpawnCount)
+    if (particleSlotID >= totalSpawnCount)
     {
         return;
     }
 
-    let isStaticParticleSpawn = globalId.x < staticParticleSpawnCount;
+    let isStaticParticleSpawn = particleSlotID < staticParticleSpawnCount;
 
     var particleState = ParticleState(vec2<f32>(0.0, 0.0), 
                                       vec2<f32>(0.0, 0.0), 
@@ -273,11 +301,16 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     // Static Particle Spawn, As Bricks
     if (isStaticParticleSpawn) 
     {
-        let staticParticleSpawnID_2D = TransformID_1To2_UInt(particleID, vec2<u32>(staticParticleSpawnWidth, staticParticleSpawnHeight));
+        let staticParticleSpawnID_2D = TransformID_1To2_UInt(particleSlotID, vec2<u32>(staticParticleSpawnWidth, staticParticleSpawnHeight));
         particleState.position = staticParticleSpawnRectMinMax.xy + vec2<f32>(staticParticleSpawnID_2D);
         particleState.velocity = vec2<f32>(0.0, 0.0);
-        particleState.color = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+        var randomColor = UnpackColor(Hash(particleSlotID));
+        particleState.color = randomColor;
         particleActivateState = PARTICLE_ACTIVATE_STATE_STATIC;
+        var indexInActiveParticleSlotIndexBuffer = IncrementStaticParticleCount();
+        _ActiveStaticParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
+        WriteParticleState(particleSlotID, particleState);
+        WriteParticleActivateState(particleSlotID, particleActivateState);
     }
     // Dynamic Particle Spawn, From Reflection Board, As Bullets
     else 
@@ -290,11 +323,200 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
                                                 reflectionBoardHeight * 0.5);
 
         particleState.position = reflectionBoardUpperCenterPoint;
-        particleState.velocity = vec2<f32>(0.0, 0.0);
+
+        var randomVel = normalize(UnpackColor(Hash(particleSlotID)).rg * 2.0 - 1.0);
+        randomVel.y = select(randomVel.y, -randomVel.y, randomVel.y < 0.0);
+
+        particleState.velocity = _Uniforms._DynamicParticleMaxSpeed * randomVel;
+
         particleState.color = _Uniforms._ReflectionBoardColor;
         particleActivateState = PARTICLE_ACTIVATE_STATE_DYNAMIC;
+        var indexInActiveParticleSlotIndexBuffer = IncrementDynamicParticleCount();
+        _ActiveDynamicParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
+        WriteParticleState(particleSlotID, particleState);
+        WriteParticleActivateState(particleSlotID, particleActivateState);
     }
 
-    WriteParticleState(particleID, particleState);
-    WriteParticleActivateState(particleID, particleActivateState);
+}
+
+
+
+@compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
+fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
+{
+    if (globalId.x >= GetPrevDynamicParticleCount())
+    {
+        return;
+    }
+
+    let particleSlotID = _ActiveDynamicParticleSlotIndexBuffer_R[globalId.x];
+    var particleState = ReadPrevParticleState(particleSlotID);
+    let particleActivateState = ReadPrevParticleActivateState(particleSlotID);
+    let deltaTime = _Uniforms._DeltaTime;
+
+    particleState.position += particleState.velocity * deltaTime;
+    WriteParticleState(particleSlotID, particleState);
+    WriteParticleActivateState(particleSlotID, particleActivateState);
+
+    var indexInActiveParticleSlotIndexBuffer = IncrementDynamicParticleCount();
+    _ActiveDynamicParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
+}
+
+
+@compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
+fn UpdateStaticParticles_ConvertPreDynamic(@builtin(global_invocation_id) globalId: vec3<u32>)
+{
+    if (globalId.x >= GetPrevStaticParticleCount())
+    {
+        return;
+    }
+
+    let particleSlotID = _ActiveStaticParticleSlotIndexBuffer_R[globalId.x];
+    var particleState = ReadPrevParticleState(particleSlotID);
+    var particleActivateState = ReadPrevParticleActivateState(particleSlotID);
+    let deltaTime = _Uniforms._DeltaTime;
+
+    if (particleActivateState != PARTICLE_ACTIVATE_STATE_PRE_DYNAMIC)
+    {
+        return;
+    }
+    
+    particleActivateState = PARTICLE_ACTIVATE_STATE_DYNAMIC;
+    // Initialize Velocity Here
+    particleState.velocity = vec2<f32>(0.0, 1.0);
+    particleState.position += particleState.velocity * deltaTime;
+    var indexInActiveParticleSlotIndexBuffer = IncrementDynamicParticleCount();
+    _ActiveDynamicParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
+    WriteParticleState(particleSlotID, particleState);
+    WriteParticleActivateState(particleSlotID, particleActivateState);
+}
+
+
+@compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
+fn UpdateStaticParticles_CollectStatic(@builtin(global_invocation_id) globalId: vec3<u32>)
+{
+    if (globalId.x >= GetPrevStaticParticleCount())
+    {
+        return;
+    }
+
+    let particleSlotID = _ActiveStaticParticleSlotIndexBuffer_R[globalId.x];
+    var particleState = ReadPrevParticleState(particleSlotID);
+    var particleActivateState = ReadPrevParticleActivateState(particleSlotID);
+
+    if (particleActivateState != PARTICLE_ACTIVATE_STATE_STATIC)
+    {
+        return;
+    }
+    
+    var indexInActiveParticleSlotIndexBuffer = IncrementStaticParticleCount();
+    _ActiveStaticParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
+    WriteParticleState(particleSlotID, particleState);
+    WriteParticleActivateState(particleSlotID, particleActivateState);
+}
+
+
+@compute @workgroup_size(8, 8, 1)
+fn FadeSoftwareRasterizeTarget(@builtin(global_invocation_id) globalId: vec3<u32>)
+{
+    let texelSize = _Uniforms._RenderTargetTexelSize;
+    let textureSize = vec2<u32>( u32(texelSize.z), u32(texelSize.w));
+
+    let pixelIndex = globalId.xy;
+    if (pixelIndex.x >= textureSize.x || pixelIndex.y >= textureSize.y)
+    {
+        return;
+    }    
+
+    let id1d = TransformID_2To1_UInt(pixelIndex, textureSize);
+    var packedColor = _RasterTargetBuffer_R[id1d];
+    var color = UnpackColor(packedColor);
+    color *= 0.95;
+    color = saturate(color);
+
+    packedColor = PackColor(color);
+
+    atomicStore(&_RasterTargetBuffer_RW[id1d], packedColor);
+}
+
+
+
+@compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
+fn SoftwareRasterizeStaticParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
+{
+    if (globalId.x >= GetCurrentStaticParticleCount())
+    {
+        return;
+    }
+
+    let texelSize = _Uniforms._RenderTargetTexelSize;
+    let textureSize = vec2<u32>( u32(texelSize.z), u32(texelSize.w));
+
+    let particleSlotID = _ActiveStaticParticleSlotIndexBuffer_R[globalId.x];
+    let particleState = ReadPrevParticleState(particleSlotID);
+
+    var pixelIndex = vec2<u32>(u32(particleState.position.x), u32(particleState.position.y));
+    if (pixelIndex.x >= textureSize.x || pixelIndex.y >= textureSize.y)
+    {
+        return;
+    }
+
+    let id1d = TransformID_2To1_UInt(pixelIndex, textureSize);
+    let packedColor = PackColor(particleState.color);
+    atomicStore(&_RasterTargetBuffer_RW[id1d], packedColor);
+}
+
+
+
+fn RasterizeDynamicParticle(uv: vec2<f32>, particleState: ParticleState) -> vec4<f32>
+{
+    return particleState.color;
+}
+
+
+@compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
+fn SoftwareRasterizeDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
+{
+    if (globalId.x >= GetCurrentDynamicParticleCount())
+    {
+        return;
+    }
+
+    let texelSize = _Uniforms._RenderTargetTexelSize;
+    let textureSize = vec2<u32>( u32(texelSize.z), u32(texelSize.w));
+
+    let particleSlotID = _ActiveDynamicParticleSlotIndexBuffer_R[globalId.x];
+    let particleState = ReadPrevParticleState(particleSlotID);
+
+    let pixelIndex = vec2<u32>(u32(particleState.position.x), u32(particleState.position.y));
+    if (pixelIndex.x >= textureSize.x || pixelIndex.y >= textureSize.y)
+    {
+        return;
+    }
+
+
+    let particleRenderSize = i32(_Uniforms._DynamicParticleSize);
+
+    for (var x = 0; x < particleRenderSize; x++)
+    {
+        for (var y = 0; y < particleRenderSize; y++)
+        {
+            let texel = vec2<i32>(i32(pixelIndex.x), i32(pixelIndex.y)) 
+                + vec2<i32>(x - particleRenderSize / 2, y - particleRenderSize / 2);
+            
+            let texel1D = TransformID_2To1_Int(texel, vec2<i32>(i32(textureSize.x), i32(textureSize.y)));
+            if (texel1D < 0 || texel1D > i32(textureSize.x * textureSize.y))
+            {
+               continue;
+            }
+            
+            var uv = vec2<f32>(f32(x), f32(y)) / f32(particleRenderSize);
+            uv = uv * 2.0 - 1.0;
+
+            let color = RasterizeDynamicParticle(uv, particleState);
+            let packedColor = PackColor(color);
+
+            atomicOr(&_RasterTargetBuffer_RW[u32(texel1D)], packedColor);
+        }
+    }
 }

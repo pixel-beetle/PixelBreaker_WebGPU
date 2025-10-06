@@ -76,9 +76,11 @@ export class Application
                     this.engine, 
                     {width: 1920, height: 1080},
                     this.jumpFloodingSDFGenerator.resultTexture!);
+
+                this.sceneManager.render(this.pixelBreakerManager.renderMaterial!);
             }
             
-            this.sceneManager.render(this.jumpFloodingSDFGenerator.resultTexture!);
+            
         });
     }
 

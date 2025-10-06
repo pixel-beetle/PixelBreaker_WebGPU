@@ -6,8 +6,10 @@ import { DoubleBufferedStorageBuffer } from "../GfxUtils/DoubleBufferUtils";
 import { IndirectArgsBuffer } from "../GfxUtils/IndirectArgsBuffer";
 import { ComputeShaderSet } from "../GfxUtils/ComputeShaderSet";
 import pixelBreakerComputeShader from "../../Shaders/PixelBreaker.compute.wgsl";
+import pixelBreakerRenderVS from "../../Shaders/PixelBreaker.render.vs.wgsl";
+import pixelBreakerRenderFS from "../../Shaders/PixelBreaker.render.fs.wgsl";
 import { SharedTextureSamplerCollection } from "../GfxUtils/SharedTextureSampler";
-import { NumberInput, UIProperty } from '../GUI/UIProperty';
+import { NumberInput } from '../GUI/UIProperty';
 
 
 class RenderTargetSizeInfo
@@ -63,13 +65,13 @@ export class PixelBreakerManager
     public staticParticleSpawnRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0, 0.5);
     public staticParticleSpawnRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(1, 0.75);
     
-    public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.5);
-    public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.55);
+    public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.25);
+    public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.28);
 
-    public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.8, 0.8, 0.8, 1.0);
+    public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.8, 0.0, 0.8, 1.0);
 
-    public dynamicParticleMaxSpeed: number = 10.0;
-    public dynamicParticleSize: number = 2.0;
+    public dynamicParticleMaxSpeed: number = 0.1;
+    public dynamicParticleSize: number = 16.0;
 
     public particleCountReadback: ParticleCountReadbackBuffer = new ParticleCountReadbackBuffer();
     
@@ -81,26 +83,33 @@ export class PixelBreakerManager
     private _reflectionBoardRectMax: BABYLON.Vector2 = new BABYLON.Vector2(-1, -1);
 
     private _isInitialiSpawnDone: boolean = false;
+    private _time: number = 0;
 
     // Resources
     private _scene: BABYLON.Scene | null = null;
     private _engine: BABYLON.AbstractEngine | null = null;
 
-    private _uniformBuffer: UniformBuffer | null = null;
+    private _computeUBO: UniformBuffer | null = null;
+    private _renderUBO: UniformBuffer | null = null;
     
     private _particleMemoryBuffer: DoubleBufferedStorageBuffer | null = null;
     private _particleActivateStateBuffer: DoubleBufferedStorageBuffer | null = null;
     private _particleCountBuffer: DoubleBufferedStorageBuffer | null = null;
-    private _particleConvertCandidateBuffer: StorageBuffer | null = null;
+    private _activeDynamicParticleSlotIndexBuffer: DoubleBufferedStorageBuffer | null = null;
+    private _activeStaticParticleSlotIndexBuffer: DoubleBufferedStorageBuffer | null = null;
 
     private _softwareRasterTargetBuffer: DoubleBufferedStorageBuffer | null = null;
 
     private _computeShaderSet: ComputeShaderSet | null = null;
     private _sharedTextureSamplerCollection: SharedTextureSamplerCollection | null = null;
 
-    private _indirectArgs_UpdateDynamicParticles: IndirectArgsBuffer | null = null;
-    private _indirectArgs_ConvertStaticParticles: IndirectArgsBuffer | null = null;
-    private _indirectArgs_RasterizeParticles: IndirectArgsBuffer | null = null;
+    private _indirectDispatchArgsBuffer: IndirectArgsBuffer | null = null;
+
+    private _renderMaterial: BABYLON.ShaderMaterial | null = null;
+    public get renderMaterial() : BABYLON.ShaderMaterial | null
+    {
+        return this._renderMaterial;
+    }
 
     public InitializeIfNeeded(scene: BABYLON.Scene, 
         engine: BABYLON.AbstractEngine,
@@ -118,19 +127,31 @@ export class PixelBreakerManager
             return false;
         }
 
-        if (!this._uniformBuffer)
+        if (!this._renderUBO)
         {
-            this._uniformBuffer = new UniformBuffer(this._engine);
-            this._uniformBuffer.name = "PixelBreaker UniformBuffer";
-            this._uniformBuffer.addUniform("_RenderTargetTexelSize", 4);
-            this._uniformBuffer.addUniform("_TotalParticleCapacity", 1);
-            this._uniformBuffer.addUniform("_DynamicParticleInitialCount", 1);
-            this._uniformBuffer.addUniform("_DynamicParticleMaxSpeed", 1);
-            this._uniformBuffer.addUniform("_DynamicParticleSize", 1);
-            this._uniformBuffer.addUniform("_StaticParticleSpawnRectMinMax", 4);
-            this._uniformBuffer.addUniform("_ReflectionBoardRectMinMax", 4);
-            this._uniformBuffer.addUniform("_ReflectionBoardColor", 4);
-            this._uniformBuffer.create();
+            this._renderUBO = new UniformBuffer(this._engine);
+            this._renderUBO.name = "PixelBreaker Render UniformBuffer";
+            this._renderUBO.addUniform("_RenderTargetTexelSize", 4);
+            this._renderUBO.addUniform("_ReflectionBoardRectMinMax", 4);
+            this._renderUBO.addUniform("_ReflectionBoardColor", 4);
+            this._renderUBO.create();
+        }
+
+        if (!this._computeUBO)
+        {
+            this._computeUBO = new UniformBuffer(this._engine);
+            this._computeUBO.name = "PixelBreaker UniformBuffer";
+            this._computeUBO.addUniform("_Time", 1);
+            this._computeUBO.addUniform("_DeltaTime", 1);
+            this._computeUBO.addUniform("_RenderTargetTexelSize", 4);
+            this._computeUBO.addUniform("_TotalParticleCapacity", 1);
+            this._computeUBO.addUniform("_DynamicParticleInitialCount", 1);
+            this._computeUBO.addUniform("_DynamicParticleMaxSpeed", 1);
+            this._computeUBO.addUniform("_DynamicParticleSize", 1);
+            this._computeUBO.addUniform("_StaticParticleSpawnRectMinMax", 4);
+            this._computeUBO.addUniform("_ReflectionBoardRectMinMax", 4);
+            this._computeUBO.addUniform("_ReflectionBoardColor", 4);
+            this._computeUBO.create();
         }
         
         if(!this._computeShaderSet)
@@ -181,14 +202,26 @@ export class PixelBreakerManager
             this._particleCountBuffer.Create();
 
 
-            if (this._particleConvertCandidateBuffer)
-                this._particleConvertCandidateBuffer.dispose();
-            this._particleConvertCandidateBuffer = new StorageBuffer(
+            if (this._activeDynamicParticleSlotIndexBuffer)
+                this._activeDynamicParticleSlotIndexBuffer.Release();
+            this._activeDynamicParticleSlotIndexBuffer = new DoubleBufferedStorageBuffer(
                 this._engine as BABYLON.WebGPUEngine,
                 TOTAL_PARTICLE_CAPACITY * 1, 
                 BABYLON.Constants.BUFFER_CREATIONFLAG_STORAGE | BABYLON.Constants.BUFFER_CREATIONFLAG_READWRITE,
-                "ParticleConvertCandidateBuffer"
+                "ActiveParticleSlotIndexBuffer"
             );
+            this._activeDynamicParticleSlotIndexBuffer.Create();
+
+            if (this._activeStaticParticleSlotIndexBuffer)
+                this._activeStaticParticleSlotIndexBuffer.Release();
+            this._activeStaticParticleSlotIndexBuffer = new DoubleBufferedStorageBuffer(
+                this._engine as BABYLON.WebGPUEngine,
+                TOTAL_PARTICLE_CAPACITY * 1, 
+                BABYLON.Constants.BUFFER_CREATIONFLAG_STORAGE | BABYLON.Constants.BUFFER_CREATIONFLAG_READWRITE,
+                "ActiveStaticParticleSlotIndexBuffer"
+            );
+            this._activeStaticParticleSlotIndexBuffer.Create();
+
 
             if (this._softwareRasterTargetBuffer)
                 this._softwareRasterTargetBuffer.Release();
@@ -204,28 +237,17 @@ export class PixelBreakerManager
 
 
         // Indirect Args Buffers
-        if (!this._indirectArgs_UpdateDynamicParticles)
+        if (!this._indirectDispatchArgsBuffer)
         {
-            this._indirectArgs_UpdateDynamicParticles = new IndirectArgsBuffer(
+            this._indirectDispatchArgsBuffer = new IndirectArgsBuffer(
                 this._engine as BABYLON.WebGPUEngine, 
-                3, BABYLON.Constants.BUFFER_CREATIONFLAG_READWRITE, 
-                "IndirectArgs_UpdateDynamicParticles"
-            );
-        }
-        if (!this._indirectArgs_ConvertStaticParticles)
-        {
-            this._indirectArgs_ConvertStaticParticles = new IndirectArgsBuffer(
-                this._engine as BABYLON.WebGPUEngine, 
-                3, BABYLON.Constants.BUFFER_CREATIONFLAG_READWRITE, 
-                "IndirectArgs_ConvertStaticParticles"
-            );
-        }
-        if (!this._indirectArgs_RasterizeParticles)
-        {
-            this._indirectArgs_RasterizeParticles = new IndirectArgsBuffer(
-                this._engine as BABYLON.WebGPUEngine, 
-                3, BABYLON.Constants.BUFFER_CREATIONFLAG_READWRITE, 
-                "IndirectArgs_RasterizeParticles"
+                // [0 ~ 2] = Update Dynamic Particles, 
+                // [3 ~ 5] = Update Static Particles, 
+                // [6 ~ 8] = Rasterize Static Particles
+                // [9 ~ 11] = Rasterize Dynamic Particles
+                3 * 4, 
+                BABYLON.Constants.BUFFER_CREATIONFLAG_READWRITE, 
+                "IndirectDispatchArgs"
             );
         }
 
@@ -235,13 +257,32 @@ export class PixelBreakerManager
             return false;
         }
 
+        if (!this._renderMaterial)
+        {
+            const material = new BABYLON.ShaderMaterial("PixelBreakerRender", 
+                this._scene!, 
+                {
+                    vertexSource: "// VS\n" + pixelBreakerRenderVS,
+                    fragmentSource: "// FS\n" + pixelBreakerRenderFS,
+                }, 
+                {
+                    attributes: ["position", "uv"],
+                    uniformBuffers: ["Scene", "Mesh"],
+                    shaderLanguage: BABYLON.ShaderLanguage.WGSL,
+                });
+            this._renderMaterial = material;
+        }
+
         return true;
     }
 
     public Release()
     {
-        if (this._uniformBuffer)
-            this._uniformBuffer.dispose();
+        if (this._computeUBO)
+            this._computeUBO.dispose();
+
+        if (this._renderUBO)
+            this._renderUBO.dispose();
 
         if (this._particleMemoryBuffer)
             this._particleMemoryBuffer.Release();
@@ -252,31 +293,28 @@ export class PixelBreakerManager
         if (this._particleCountBuffer)
             this._particleCountBuffer.Release();
 
-        if (this._particleConvertCandidateBuffer)
-            this._particleConvertCandidateBuffer.dispose();
+        if (this._activeDynamicParticleSlotIndexBuffer)
+            this._activeDynamicParticleSlotIndexBuffer.Release();
+
+        if (this._activeStaticParticleSlotIndexBuffer)
+            this._activeStaticParticleSlotIndexBuffer.Release();
 
         if (this._softwareRasterTargetBuffer)
             this._softwareRasterTargetBuffer.Release();
 
-        if (this._indirectArgs_UpdateDynamicParticles)
-            this._indirectArgs_UpdateDynamicParticles.Release();
+        if (this._indirectDispatchArgsBuffer)
+            this._indirectDispatchArgsBuffer.Release();
 
-        if (this._indirectArgs_ConvertStaticParticles)
-            this._indirectArgs_ConvertStaticParticles.Release();
-
-        if (this._indirectArgs_RasterizeParticles)
-            this._indirectArgs_RasterizeParticles.Release();
-
-        this._uniformBuffer = null;
+        this._computeUBO = null;
+        this._renderUBO = null;
         this._particleMemoryBuffer = null;
         this._particleActivateStateBuffer = null;
         this._particleCountBuffer = null;
-        this._particleConvertCandidateBuffer = null;
+        this._activeDynamicParticleSlotIndexBuffer = null;
+        this._activeStaticParticleSlotIndexBuffer = null;
         this._softwareRasterTargetBuffer = null;
         this._computeShaderSet = null;
-        this._indirectArgs_UpdateDynamicParticles = null;
-        this._indirectArgs_ConvertStaticParticles = null;
-        this._indirectArgs_RasterizeParticles = null;
+        this._indirectDispatchArgsBuffer = null;
         this._scene = null;
         this._engine = null;
         this._sharedTextureSamplerCollection = null;
@@ -284,15 +322,17 @@ export class PixelBreakerManager
     }
 
 
-    private UpdateUniformBuffer_Params()
+    private UpdateComputeUBO()
     {
-        if (!this._uniformBuffer)
+        if (!this._computeUBO)
             return;
-        this._uniformBuffer.updateVector4("_RenderTargetTexelSize", this._renderTargetSizeInfo.texelSize);
-        this._uniformBuffer.updateUInt("_TotalParticleCapacity", this.dynamicParticleInitialCount + this._renderTargetSizeInfo.totalTexelCount);
-        this._uniformBuffer.updateUInt("_DynamicParticleInitialCount", this.dynamicParticleInitialCount);
-        this._uniformBuffer.updateFloat("_DynamicParticleMaxSpeed", this.dynamicParticleMaxSpeed);
-        this._uniformBuffer.updateFloat("_DynamicParticleSize", this.dynamicParticleSize);
+        this._computeUBO.updateFloat("_Time", this._time);
+        this._computeUBO.updateFloat("_DeltaTime", this._scene!.deltaTime);
+        this._computeUBO.updateVector4("_RenderTargetTexelSize", this._renderTargetSizeInfo.texelSize);
+        this._computeUBO.updateUInt("_TotalParticleCapacity", this.dynamicParticleInitialCount + this._renderTargetSizeInfo.totalTexelCount);
+        this._computeUBO.updateUInt("_DynamicParticleInitialCount", this.dynamicParticleInitialCount);
+        this._computeUBO.updateFloat("_DynamicParticleMaxSpeed", this.dynamicParticleMaxSpeed);
+        this._computeUBO.updateFloat("_DynamicParticleSize", this.dynamicParticleSize);
         
         this._staticParticleSpawnRectMin = new BABYLON.Vector2(
             this.staticParticleSpawnRectMin01.x * this._renderTargetSizeInfo.width, 
@@ -325,10 +365,29 @@ export class PixelBreakerManager
             this._reflectionBoardRectMax.y
         );
         const reflectionBoardColor = new BABYLON.Vector4(this.reflectionBoardColor.r, this.reflectionBoardColor.g, this.reflectionBoardColor.b, this.reflectionBoardColor.a);
-        this._uniformBuffer.updateVector4("_StaticParticleSpawnRectMinMax", staticParticleSpawnRectMinMax);
-        this._uniformBuffer.updateVector4("_ReflectionBoardRectMinMax", reflectionBoardRectMinMax);
-        this._uniformBuffer.updateVector4("_ReflectionBoardColor", reflectionBoardColor);
-        this._uniformBuffer.update();
+        this._computeUBO.updateVector4("_StaticParticleSpawnRectMinMax", staticParticleSpawnRectMinMax);
+        this._computeUBO.updateVector4("_ReflectionBoardRectMinMax", reflectionBoardRectMinMax);
+        this._computeUBO.updateVector4("_ReflectionBoardColor", reflectionBoardColor);
+        this._computeUBO.update();
+    }
+
+    private UpdateRenderUBO()
+    {
+        if (!this._renderUBO)
+            return;
+
+        const reflectionBoardColor = new BABYLON.Vector4(this.reflectionBoardColor.r, this.reflectionBoardColor.g, this.reflectionBoardColor.b, this.reflectionBoardColor.a);
+        const reflectionBoardRectMinMax = new BABYLON.Vector4(
+            this._reflectionBoardRectMin.x, 
+            this._reflectionBoardRectMin.y, 
+            this._reflectionBoardRectMax.x, 
+            this._reflectionBoardRectMax.y
+        );
+
+        this._renderUBO.updateVector4("_RenderTargetTexelSize", this._renderTargetSizeInfo.texelSize);
+        this._renderUBO.updateVector4("_ReflectionBoardRectMinMax", reflectionBoardRectMinMax);
+        this._renderUBO.updateVector4("_ReflectionBoardColor", reflectionBoardColor);
+        this._renderUBO.update();
     }
 
 
@@ -345,26 +404,31 @@ export class PixelBreakerManager
             return;
         }
 
-        this.UpdateUniformBuffer_Params();
+        this._time += this._scene!.deltaTime;
+        this.UpdateComputeUBO();
 
         if (!this._isInitialiSpawnDone)
         {
             this._isInitialiSpawnDone = this.DispatchParticleInitSpawn();
-            console.log("Initial Spawn: ", this._isInitialiSpawnDone);
-            if (this._isInitialiSpawnDone)
-                this.DispatchParticleSoftwareRasterize();
+            this.DispatchFillIndirectArgs();
+            this.DispatchParticleSoftwareRasterize();
+            this.UpdateRenderMaterial();
             return;
         }
 
         this._particleMemoryBuffer!.Swap();
         this._particleActivateStateBuffer!.Swap();
-        // this._particleCountBuffer!.Swap();
+        this._particleCountBuffer!.Swap();
+        this._activeDynamicParticleSlotIndexBuffer!.Swap();
+        this._activeStaticParticleSlotIndexBuffer!.Swap();
         this._softwareRasterTargetBuffer!.Swap();
 
         this.DispatchClearParticleCounter();
-        this.DispatchConvertStaticParticles();
+        this.DispatchUpdateStaticParticles();
         this.DispatchUpdateDynamicParticles();
+        this.DispatchFillIndirectArgs();
         this.DispatchParticleSoftwareRasterize();
+        this.UpdateRenderMaterial();
 
         this._particleCountBuffer?.Current()?.read(0,3 * 4, this.particleCountReadback.buffer).then(() => {
             this.particleCountReadback.Update();
@@ -389,17 +453,17 @@ export class PixelBreakerManager
                     (this._staticParticleSpawnRectMax.x - this._staticParticleSpawnRectMin.x) 
                     * (this._staticParticleSpawnRectMax.y - this._staticParticleSpawnRectMin.y);
         const totalSpawnCount = this.dynamicParticleInitialCount + staticParticleSpawnCount;
-        console.log("Initial Spawn Count Dynamic: ", this.dynamicParticleInitialCount);
-        console.log("Initial Spawn Count Static: ", staticParticleSpawnCount);
 
-        kInitialFillParticleCountBuffer!.cs!.setUniformBuffer("_Uniforms", this._uniformBuffer!);
         kInitialFillParticleCountBuffer!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
+        kInitialFillParticleCountBuffer!.cs!.setStorageBuffer("_IndirectDispatchArgsBuffer_RW", this._indirectDispatchArgsBuffer!.storageBuffer);
         kInitialFillParticleCountBuffer!.cs!.dispatch(1, 1, 1);
 
-        kInitialSpawnParticles!.cs!.setUniformBuffer("_Uniforms", this._uniformBuffer!);
+        kInitialSpawnParticles!.cs!.setUniformBuffer("_Uniforms", this._computeUBO!);
         kInitialSpawnParticles!.cs!.setStorageBuffer("_ParticleMemoryBuffer_RW", this._particleMemoryBuffer!.Current()!);
         kInitialSpawnParticles!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_RW", this._particleActivateStateBuffer!.Current()!);
-        
+        kInitialSpawnParticles!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
+        kInitialSpawnParticles!.cs!.setStorageBuffer("_ActiveDynamicParticleSlotIndexBuffer_RW", this._activeDynamicParticleSlotIndexBuffer!.Current()!);
+        kInitialSpawnParticles!.cs!.setStorageBuffer("_ActiveStaticParticleSlotIndexBuffer_RW", this._activeStaticParticleSlotIndexBuffer!.Current()!);
         const workGroupSizeX = kInitialSpawnParticles!.workgroupSizeX;
         const canSpawn = kInitialSpawnParticles!.cs!.dispatch((totalSpawnCount + workGroupSizeX - 1) / workGroupSizeX, 1, 1);
         return canSpawn;
@@ -414,7 +478,9 @@ export class PixelBreakerManager
             return;
 
         kClearParticleCounter!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
-        kClearParticleCounter!.cs!.dispatch(1, 1, 1);
+        const canClear = kClearParticleCounter!.cs!.dispatch(1, 1, 1);
+        if (!canClear)
+            console.warn("Failed to clear particle counter");
     }
 
     private DispatchFillIndirectArgs()
@@ -425,34 +491,56 @@ export class PixelBreakerManager
         if (!kFillIndirectArgs)
             return;
 
-        kFillIndirectArgs!.cs!.setUniformBuffer("_Uniforms", this._uniformBuffer!);
         kFillIndirectArgs!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
-        kFillIndirectArgs!.cs!.setStorageBuffer("_IndirectDispatchArgsBuffer_UpdateDynamicParticles_RW", this._indirectArgs_UpdateDynamicParticles!.storageBuffer);
-        kFillIndirectArgs!.cs!.setStorageBuffer("_IndirectDispatchArgsBuffer_ConvertStaticParticles_RW", this._indirectArgs_ConvertStaticParticles!.storageBuffer);
-        kFillIndirectArgs!.cs!.setStorageBuffer("_IndirectDispatchArgsBuffer_RasterizeParticles_RW", this._indirectArgs_RasterizeParticles!.storageBuffer);
-        kFillIndirectArgs!.cs!.dispatch(1, 1, 1);
+        kFillIndirectArgs!.cs!.setStorageBuffer("_IndirectDispatchArgsBuffer_RW", this._indirectDispatchArgsBuffer!.storageBuffer);
+        const canFill = kFillIndirectArgs!.cs!.dispatch(1, 1, 1);
+        if (!canFill)
+            console.warn("Failed to fill indirect args");
     }
+
+
+    private _UINT_BYTE_SIZE = 4;
 
     private DispatchParticleSoftwareRasterize()
     {
         if (!this._computeShaderSet)
             return;
 
-        const kSoftwareRasterizeParticles = this._computeShaderSet.GetKernel("SoftwareRasterizeParticles");
-        if (!kSoftwareRasterizeParticles)
+        const kFadeSoftwareRasterizeTarget = this._computeShaderSet.GetKernel("FadeSoftwareRasterizeTarget");
+        if (!kFadeSoftwareRasterizeTarget)
+            return;
+        const kSoftwareRasterizeStaticParticles = this._computeShaderSet.GetKernel("SoftwareRasterizeStaticParticles");
+        if (!kSoftwareRasterizeStaticParticles)
+            return;
+        const kSoftwareRasterizeDynamicParticles = this._computeShaderSet.GetKernel("SoftwareRasterizeDynamicParticles");
+        if (!kSoftwareRasterizeDynamicParticles)
             return;
 
 
-    }
+        kFadeSoftwareRasterizeTarget!.cs!.setUniformBuffer("_Uniforms", this._computeUBO!);
+        kFadeSoftwareRasterizeTarget!.cs!.setStorageBuffer("_RasterTargetBuffer_R", this._softwareRasterTargetBuffer!.Prev()!);
+        kFadeSoftwareRasterizeTarget!.cs!.setStorageBuffer("_RasterTargetBuffer_RW", this._softwareRasterTargetBuffer!.Current()!);
+        kFadeSoftwareRasterizeTarget!.cs!.dispatch(
+            (this._renderTargetSizeInfo.width + kFadeSoftwareRasterizeTarget!.workgroupSizeX - 1) 
+            / kFadeSoftwareRasterizeTarget!.workgroupSizeX,
+            (this._renderTargetSizeInfo.height + kFadeSoftwareRasterizeTarget!.workgroupSizeY - 1) 
+            / kFadeSoftwareRasterizeTarget!.workgroupSizeY,
+            1);
 
-
-    private DispatchConvertStaticParticles()
-    {
-        if (!this._computeShaderSet)
-            return;
-        const kConvertStaticParticles = this._computeShaderSet.GetKernel("ConvertStaticParticles");
-        if (!kConvertStaticParticles)
-            return;
+        kSoftwareRasterizeStaticParticles!.cs!.setUniformBuffer("_Uniforms", this._computeUBO!);
+        kSoftwareRasterizeStaticParticles!.cs!.setStorageBuffer("_ParticleMemoryBuffer_R", this._particleMemoryBuffer!.Current()!);
+        kSoftwareRasterizeStaticParticles!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
+        kSoftwareRasterizeStaticParticles!.cs!.setStorageBuffer("_ActiveStaticParticleSlotIndexBuffer_R", this._activeStaticParticleSlotIndexBuffer!.Current()!);
+        kSoftwareRasterizeStaticParticles!.cs!.setStorageBuffer("_RasterTargetBuffer_RW", this._softwareRasterTargetBuffer!.Current()!);
+        kSoftwareRasterizeStaticParticles!.cs!.dispatchIndirect(this._indirectDispatchArgsBuffer!.storageBuffer, 6 * this._UINT_BYTE_SIZE);
+    
+    
+        kSoftwareRasterizeDynamicParticles!.cs!.setUniformBuffer("_Uniforms", this._computeUBO!);
+        kSoftwareRasterizeDynamicParticles!.cs!.setStorageBuffer("_ParticleMemoryBuffer_R", this._particleMemoryBuffer!.Current()!);
+        kSoftwareRasterizeDynamicParticles!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
+        kSoftwareRasterizeDynamicParticles!.cs!.setStorageBuffer("_ActiveDynamicParticleSlotIndexBuffer_R", this._activeDynamicParticleSlotIndexBuffer!.Current()!);
+        kSoftwareRasterizeDynamicParticles!.cs!.setStorageBuffer("_RasterTargetBuffer_RW", this._softwareRasterTargetBuffer!.Current()!);
+        kSoftwareRasterizeDynamicParticles!.cs!.dispatchIndirect(this._indirectDispatchArgsBuffer!.storageBuffer, 9 * this._UINT_BYTE_SIZE);
     }
 
 
@@ -463,8 +551,63 @@ export class PixelBreakerManager
         const kUpdateDynamicParticles = this._computeShaderSet.GetKernel("UpdateDynamicParticles");
         if (!kUpdateDynamicParticles)
             return;
+
+        kUpdateDynamicParticles!.cs!.setUniformBuffer("_Uniforms", this._computeUBO!);
+        kUpdateDynamicParticles!.cs!.setStorageBuffer("_ParticleMemoryBuffer_R", this._particleMemoryBuffer!.Prev()!);
+        kUpdateDynamicParticles!.cs!.setStorageBuffer("_ParticleMemoryBuffer_RW", this._particleMemoryBuffer!.Current()!);
+        kUpdateDynamicParticles!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_R", this._particleActivateStateBuffer!.Prev()!);
+        kUpdateDynamicParticles!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_RW", this._particleActivateStateBuffer!.Current()!);
+        kUpdateDynamicParticles!.cs!.setStorageBuffer("_ParticleCountBuffer_R", this._particleCountBuffer!.Prev()!);
+        kUpdateDynamicParticles!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
+        kUpdateDynamicParticles!.cs!.setStorageBuffer("_ActiveDynamicParticleSlotIndexBuffer_R", this._activeDynamicParticleSlotIndexBuffer!.Prev()!);
+        kUpdateDynamicParticles!.cs!.setStorageBuffer("_ActiveDynamicParticleSlotIndexBuffer_RW", this._activeDynamicParticleSlotIndexBuffer!.Current()!);
+        kUpdateDynamicParticles!.cs!.dispatchIndirect(this._indirectDispatchArgsBuffer!.storageBuffer, 0 * this._UINT_BYTE_SIZE);
+    }
+
+
+    private DispatchUpdateStaticParticles()
+    {
+        if (!this._computeShaderSet)
+            return;
+
+        const kUpdateStaticParticles_ConvertPreDynamic = this._computeShaderSet.GetKernel("UpdateStaticParticles_ConvertPreDynamic");
+        if (!kUpdateStaticParticles_ConvertPreDynamic)
+            return;
+        const kUpdateStaticParticles_CollectStatic = this._computeShaderSet.GetKernel("UpdateStaticParticles_CollectStatic");
+        if (!kUpdateStaticParticles_CollectStatic)
+            return;
+
+        kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ParticleMemoryBuffer_R", this._particleMemoryBuffer!.Prev()!);
+        kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ParticleMemoryBuffer_RW", this._particleMemoryBuffer!.Current()!);
+        kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_R", this._particleActivateStateBuffer!.Prev()!);
+        kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_RW", this._particleActivateStateBuffer!.Current()!);
+        kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ParticleCountBuffer_R", this._particleCountBuffer!.Prev()!);
+        kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
+        kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ActiveStaticParticleSlotIndexBuffer_R", this._activeStaticParticleSlotIndexBuffer!.Prev()!);
+        kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ActiveStaticParticleSlotIndexBuffer_RW", this._activeStaticParticleSlotIndexBuffer!.Current()!);
+        kUpdateStaticParticles_CollectStatic!.cs!.dispatchIndirect(this._indirectDispatchArgsBuffer!.storageBuffer, 3 * this._UINT_BYTE_SIZE);
+
+        kUpdateStaticParticles_ConvertPreDynamic!.cs!.setUniformBuffer("_Uniforms", this._computeUBO!);
+        kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ParticleMemoryBuffer_R", this._particleMemoryBuffer!.Prev()!);
+        kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ParticleMemoryBuffer_RW", this._particleMemoryBuffer!.Current()!);
+        kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_R", this._particleActivateStateBuffer!.Prev()!);
+        kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_RW", this._particleActivateStateBuffer!.Current()!);
+        kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ParticleCountBuffer_R", this._particleCountBuffer!.Prev()!);
+        kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
+        kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ActiveStaticParticleSlotIndexBuffer_R", this._activeStaticParticleSlotIndexBuffer!.Prev()!);
+        kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ActiveDynamicParticleSlotIndexBuffer_RW", this._activeDynamicParticleSlotIndexBuffer!.Current()!);
+        kUpdateStaticParticles_ConvertPreDynamic!.cs!.dispatchIndirect(this._indirectDispatchArgsBuffer!.storageBuffer, 3 * this._UINT_BYTE_SIZE);
     }
 
 
 
+    private UpdateRenderMaterial()
+    {
+        if (!this._renderMaterial)
+            return;
+
+        this.UpdateRenderUBO();
+        this._renderMaterial.setUniformBuffer("_Uniforms", this._renderUBO!);
+        this._renderMaterial.setStorageBuffer("_RasterTargetBuffer", this._softwareRasterTargetBuffer!.Current()!);
+    }
 }
