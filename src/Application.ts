@@ -1,7 +1,7 @@
 import * as BABYLON from 'babylonjs';
 import { SceneManager } from './scripts/Core/SceneManager';
 import { VideoManager } from './scripts/Core/VideoManager';
-import { UIManager } from './scripts/GUI/UIManager';
+import { ReflectionUIManager } from './scripts/GUI/ReflectionUIManager';
 import JumpFloodingSDFGenerator from './scripts/Core/JumpFloodingSDFGenerator';
 
 export class Application 
@@ -9,7 +9,7 @@ export class Application
     private engine: BABYLON.Engine;
     private sceneManager!: SceneManager;
     private videoManager!: VideoManager;
-    private uiManager!: UIManager;
+    private reflectionUIManager!: ReflectionUIManager;
     private jumpFloodingSDFGenerator!: JumpFloodingSDFGenerator;
 
     constructor(readonly canvas: HTMLCanvasElement) {
@@ -19,16 +19,23 @@ export class Application
         });
     }
 
-    private InitializeManagers(): void {
-        this.sceneManager = new SceneManager(this.engine, this.canvas);
-        this.videoManager = new VideoManager(this.sceneManager.scene);
-        this.uiManager = new UIManager(
-            () => this.videoManager.togglePlayPause(),
-            (volume) => this.videoManager.setVolume(volume),
-            () => this.videoManager.toggleMute()
-        );
+    private InitializeManagers(): void 
+    {
+        this.reflectionUIManager = new ReflectionUIManager({
+            title: 'Control Panel',
+            position: 'center',
+            expanded: true,
+            autoRefresh: true,
+            refreshInterval: 100
+        });
 
+        this.sceneManager = new SceneManager(this.engine, this.canvas);
+        this.videoManager = new VideoManager(this.sceneManager.scene, './BadApple_Video.mp4');
         this.jumpFloodingSDFGenerator = new JumpFloodingSDFGenerator();
+
+        this.reflectionUIManager.RegisterTarget('video', this.videoManager, (property: string, value: any) => {
+            this.videoManager.handlePropertyChange(property, value);
+        });
     }
 
     SetUpBabylonDebugLayer(debugOn: boolean = true): void 
@@ -51,12 +58,12 @@ export class Application
         this.SetUpBabylonDebugLayer(false);
         
         this.engine.runRenderLoop(() => {
-            this.videoManager.videoTexture.update();
+            this.videoManager!.videoTexture!.update();
 
             this.jumpFloodingSDFGenerator.Tick(
                 this.sceneManager.scene, 
                 this.engine, 
-                this.videoManager.videoTexture);
+                this.videoManager!.videoTexture!);
             
             this.sceneManager.render(this.jumpFloodingSDFGenerator.tempBuffer?.Current()!);
         });
@@ -65,7 +72,7 @@ export class Application
     // 清理资源
     dispose(): void 
     {
-        this.uiManager.dispose();
+        this.reflectionUIManager.dispose();
         this.videoManager.dispose();
         this.sceneManager.dispose();
         this.engine.dispose();
