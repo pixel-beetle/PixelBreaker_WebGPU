@@ -109,6 +109,12 @@ export default class JumpFloodingSDFGenerator
             this._jfaUniformBuffer.create();
         }
 
+        if (!this._jfaComputeShader!.IsAllKernelsReady())
+        {
+            console.warn("JFA Compute Shaders are not ready, Update Loop will not be executed");
+            return false;
+        }
+
         return true;
     }
 

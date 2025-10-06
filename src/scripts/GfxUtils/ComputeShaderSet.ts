@@ -45,6 +45,16 @@ export class ComputeShaderSet
 {
     private _kernels: Map<string, ComputeShaderKernel> = new Map();
 
+    public IsAllKernelsReady() : boolean
+    {
+        for (const kernel of this._kernels.values())
+        {
+            if (!kernel.cs || !kernel.cs.isReady())
+                return false;
+        }
+        return true;
+    }
+
     public GetKernel(name: string) : ComputeShaderKernel | null
     {
         return this._kernels.get(name) ?? null;

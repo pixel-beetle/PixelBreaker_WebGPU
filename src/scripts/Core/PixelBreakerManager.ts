@@ -39,9 +39,13 @@ export class PixelBreakerManager
 {
     // Params
     public dynamicParticleInitialCount: number = 10000;
-    public staticParticleSpawnRectMinMax01: BABYLON.Vector4 = new BABYLON.Vector4(0, 0.5, 1, 0.75);
+
+    public staticParticleSpawnRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0, 0.5);
+    public staticParticleSpawnRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(1, 0.75);
     
-    public reflectionBoardRectMinMax01: BABYLON.Vector4 = new BABYLON.Vector4(0.4, 0.5, 0.6, 0.55);
+    public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.5);
+    public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.55);
+
     public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.8, 0.8, 0.8, 1.0);
 
     public dynamicParticleMaxSpeed: number = 10.0;
@@ -50,7 +54,12 @@ export class PixelBreakerManager
     
     // Private States
     private _renderTargetSizeInfo: RenderTargetSizeInfo = new RenderTargetSizeInfo();
-    private _isFirstTick: boolean = true;
+    private _staticParticleSpawnRectMin: BABYLON.Vector2 = new BABYLON.Vector2(-1, -1);
+    private _staticParticleSpawnRectMax: BABYLON.Vector2 = new BABYLON.Vector2(-1, -1);
+    private _reflectionBoardRectMin: BABYLON.Vector2 = new BABYLON.Vector2(-1, -1);
+    private _reflectionBoardRectMax: BABYLON.Vector2 = new BABYLON.Vector2(-1, -1);
+
+    private _isInitialiSpawnDone: boolean = false;
 
     // Resources
     private _scene: BABYLON.Scene | null = null;
@@ -92,7 +101,6 @@ export class PixelBreakerManager
         {
             this._uniformBuffer = new UniformBuffer(this._engine);
             this._uniformBuffer.name = "PixelBreaker UniformBuffer";
-            this._uniformBuffer.addUniform("_DispatchedThreadCount", 1);
             this._uniformBuffer.addUniform("_RenderTargetTexelSize", 4);
             this._uniformBuffer.addUniform("_TotalParticleCapacity", 1);
             this._uniformBuffer.addUniform("_DynamicParticleInitialCount", 1);
@@ -112,7 +120,7 @@ export class PixelBreakerManager
         // Rebuild Size Related Resources
         if (renderTargetSizeChanged)
         {
-            this._isFirstTick = true;
+            this._isInitialiSpawnDone = false;
             const TOTAL_PARTICLE_CAPACITY = this.dynamicParticleInitialCount + this._renderTargetSizeInfo.totalTexelCount;
 
             if (this._particleMemoryBuffer)
@@ -200,6 +208,12 @@ export class PixelBreakerManager
             );
         }
 
+        if (!this._computeShaderSet!.IsAllKernelsReady())
+        {
+            console.warn("PixelBreakerManager Compute Shaders are not ready, Update Loop will not be executed");
+            return false;
+        }
+
         return true;
     }
 
@@ -255,19 +269,39 @@ export class PixelBreakerManager
             return;
         this._uniformBuffer.updateVector4("_RenderTargetTexelSize", this._renderTargetSizeInfo.texelSize);
         this._uniformBuffer.updateUInt("_TotalParticleCapacity", this.dynamicParticleInitialCount + this._renderTargetSizeInfo.totalTexelCount);
+        this._uniformBuffer.updateUInt("_DynamicParticleInitialCount", this.dynamicParticleInitialCount);
         this._uniformBuffer.updateFloat("_DynamicParticleMaxSpeed", this.dynamicParticleMaxSpeed);
         this._uniformBuffer.updateFloat("_DynamicParticleSize", this.dynamicParticleSize);
-        const staticParticleSpawnRectMinMax = new BABYLON.Vector4(
-            this.staticParticleSpawnRectMinMax01.x * this._renderTargetSizeInfo.width, 
-            this.staticParticleSpawnRectMinMax01.y * this._renderTargetSizeInfo.height, 
-            this.staticParticleSpawnRectMinMax01.z * this._renderTargetSizeInfo.width, 
-            this.staticParticleSpawnRectMinMax01.w * this._renderTargetSizeInfo.height
+        
+        this._staticParticleSpawnRectMin = new BABYLON.Vector2(
+            this.staticParticleSpawnRectMin01.x * this._renderTargetSizeInfo.width, 
+            this.staticParticleSpawnRectMin01.y * this._renderTargetSizeInfo.height
         );
+        this._staticParticleSpawnRectMax = new BABYLON.Vector2(
+            this.staticParticleSpawnRectMax01.x * this._renderTargetSizeInfo.width, 
+            this.staticParticleSpawnRectMax01.y * this._renderTargetSizeInfo.height
+        );
+        this._reflectionBoardRectMin = new BABYLON.Vector2(
+            this.reflectionBoardRectMin01.x * this._renderTargetSizeInfo.width, 
+            this.reflectionBoardRectMin01.y * this._renderTargetSizeInfo.height
+        );
+        this._reflectionBoardRectMax = new BABYLON.Vector2(
+            this.reflectionBoardRectMax01.x * this._renderTargetSizeInfo.width, 
+            this.reflectionBoardRectMax01.y * this._renderTargetSizeInfo.height
+        );
+        
+        const staticParticleSpawnRectMinMax = new BABYLON.Vector4(
+            this._staticParticleSpawnRectMin.x, 
+            this._staticParticleSpawnRectMin.y, 
+            this._staticParticleSpawnRectMax.x, 
+            this._staticParticleSpawnRectMax.y,
+        );
+
         const reflectionBoardRectMinMax = new BABYLON.Vector4(
-            this.reflectionBoardRectMinMax01.x * this._renderTargetSizeInfo.width, 
-            this.reflectionBoardRectMinMax01.y * this._renderTargetSizeInfo.height, 
-            this.reflectionBoardRectMinMax01.z * this._renderTargetSizeInfo.width, 
-            this.reflectionBoardRectMinMax01.w * this._renderTargetSizeInfo.height
+            this._reflectionBoardRectMin.x, 
+            this._reflectionBoardRectMin.y, 
+            this._reflectionBoardRectMax.x, 
+            this._reflectionBoardRectMax.y
         );
         const reflectionBoardColor = new BABYLON.Vector4(this.reflectionBoardColor.r, this.reflectionBoardColor.g, this.reflectionBoardColor.b, this.reflectionBoardColor.a);
         this._uniformBuffer.updateVector4("_StaticParticleSpawnRectMinMax", staticParticleSpawnRectMinMax);
@@ -275,15 +309,6 @@ export class PixelBreakerManager
         this._uniformBuffer.updateVector4("_ReflectionBoardColor", reflectionBoardColor);
         this._uniformBuffer.update();
     }
-
-    private UpdateUniformBuffer_DispatchedThreadCount()
-    {
-        if (!this._uniformBuffer)
-            return;
-        this._uniformBuffer.updateUInt("_DispatchedThreadCount", this._renderTargetSizeInfo.totalTexelCount);
-        this._uniformBuffer.update();
-    }
-
 
     public Tick(scene: BABYLON.Scene, 
                 engine: BABYLON.AbstractEngine,
@@ -296,20 +321,94 @@ export class PixelBreakerManager
             return;
         }
 
-        if (this._isFirstTick)
+        this.UpdateUniformBuffer_Params();
+
+        if (!this._isInitialiSpawnDone)
         {
-            this._isFirstTick = false;
+            this._isInitialiSpawnDone = this.DispatchParticleInitSpawn();
+            console.log("Initial Spawn: ", this._isInitialiSpawnDone);
+            if (this._isInitialiSpawnDone)
+                this.DispatchParticleSoftwareRasterize();
             return;
         }
 
+        this._particleMemoryBuffer!.Swap();
+        this._particleActivateStateBuffer!.Swap();
+        this._particleCountBuffer!.Swap();
+        this._softwareRasterTargetBuffer!.Swap();
+
+        this.DispatchClearParticleCounter();
+        this.DispatchConvertStaticParticles();
+        this.DispatchUpdateDynamicParticles();
+        this.DispatchParticleSoftwareRasterize();
     }
 
 
 
+    private DispatchParticleInitSpawn() : boolean
+    {
+        if (!this._computeShaderSet)
+            return false;
+        const kInitialSpawnParticles = this._computeShaderSet.GetKernel("InitialSpawnParticles");
+        if (!kInitialSpawnParticles)
+            return false;        
+        
+
+        const staticParticleSpawnCount = 
+                    (this._staticParticleSpawnRectMax.x - this._staticParticleSpawnRectMin.x) 
+                    * (this._staticParticleSpawnRectMax.y - this._staticParticleSpawnRectMin.y);
+        const totalSpawnCount = this.dynamicParticleInitialCount + staticParticleSpawnCount;
+        console.log("Initial Spawn Count Dynamic: ", this.dynamicParticleInitialCount);
+        console.log("Initial Spawn Count Static: ", staticParticleSpawnCount);
+        
+        kInitialSpawnParticles!.cs!.setUniformBuffer("_Uniforms", this._uniformBuffer!);
+        kInitialSpawnParticles!.cs!.setStorageBuffer("_ParticleMemoryBuffer_RW", this._particleMemoryBuffer!.Current()!);
+        kInitialSpawnParticles!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_RW", this._particleActivateStateBuffer!.Current()!);
+        kInitialSpawnParticles!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
+        
+        const workGroupSizeX = kInitialSpawnParticles!.workgroupSizeX;
+        const canSpawn = kInitialSpawnParticles!.cs!.dispatch((totalSpawnCount + workGroupSizeX - 1) / workGroupSizeX, 1, 1);
+        return canSpawn;
+    }
+
+    private DispatchClearParticleCounter() : void
+    {
+        if (!this._computeShaderSet)
+            return;
+        const kClearParticleCounter = this._computeShaderSet.GetKernel("ClearParticleCounter");
+        if (!kClearParticleCounter)
+            return;
+    }
 
 
+    private DispatchParticleSoftwareRasterize()
+    {
+        if (!this._computeShaderSet)
+            return;
+        const kSoftwareRasterizeParticles = this._computeShaderSet.GetKernel("SoftwareRasterizeParticles");
+        if (!kSoftwareRasterizeParticles)
+            return;
+    }
 
 
+    private DispatchConvertStaticParticles()
+    {
+        if (!this._computeShaderSet)
+            return;
+        const kConvertStaticParticles = this._computeShaderSet.GetKernel("ConvertStaticParticles");
+        if (!kConvertStaticParticles)
+            return;
+    }
+
+
+    private DispatchUpdateDynamicParticles()
+    {
+        if (!this._computeShaderSet)
+            return;
+        const kUpdateDynamicParticles = this._computeShaderSet.GetKernel("UpdateDynamicParticles");
+        if (!kUpdateDynamicParticles)
+            return;
+    }
 
 
 

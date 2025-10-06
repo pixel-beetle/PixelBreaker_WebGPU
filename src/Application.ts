@@ -3,6 +3,7 @@ import { SceneManager } from './scripts/Core/SceneManager';
 import { VideoManager } from './scripts/Core/VideoManager';
 import { ReflectionUIManager } from './scripts/GUI/ReflectionUIManager';
 import JumpFloodingSDFGenerator from './scripts/Core/JumpFloodingSDFGenerator';
+import { PixelBreakerManager } from './scripts/Core/PixelBreakerManager';
 
 export class Application 
 {
@@ -11,6 +12,7 @@ export class Application
     private videoManager!: VideoManager;
     private reflectionUIManager!: ReflectionUIManager;
     private jumpFloodingSDFGenerator!: JumpFloodingSDFGenerator;
+    private pixelBreakerManager!: PixelBreakerManager;
 
     constructor(readonly canvas: HTMLCanvasElement) {
         this.engine = new BABYLON.WebGPUEngine(canvas) as any;
@@ -32,6 +34,7 @@ export class Application
         this.sceneManager = new SceneManager(this.engine, this.canvas);
         this.videoManager = new VideoManager(this.sceneManager.scene, './BadApple_Video.mp4');
         this.jumpFloodingSDFGenerator = new JumpFloodingSDFGenerator();
+        this.pixelBreakerManager = new PixelBreakerManager();
 
         this.reflectionUIManager.RegisterTarget('video', this.videoManager, (property: string, value: any) => {
             this.videoManager.handlePropertyChange(property, value);
@@ -49,7 +52,6 @@ export class Application
 
     async Run(): Promise<void> 
     {
-        // 异步初始化 WebGPU 引擎
         if ((this.engine as any).initAsync) {
             await (this.engine as any).initAsync();
         }
@@ -59,13 +61,21 @@ export class Application
         
         this.engine.runRenderLoop(() => {
             this.videoManager!.videoTexture!.update();
-
-            this.jumpFloodingSDFGenerator.Tick(
-                this.sceneManager.scene, 
-                this.engine, 
-                this.videoManager!.videoTexture!);
+            const isVideoPlaying = !this.videoManager!.videoTexture!.video.paused;
+            if (isVideoPlaying)
+            {
+                this.jumpFloodingSDFGenerator.Tick(
+                    this.sceneManager.scene, 
+                    this.engine, 
+                    this.videoManager!.videoTexture!);
+                this.pixelBreakerManager.Tick(
+                    this.sceneManager.scene, 
+                    this.engine, 
+                    {width: 1920, height: 1080},
+                    this.jumpFloodingSDFGenerator.resultTexture!);
+            }
             
-            this.sceneManager.render(this.jumpFloodingSDFGenerator.tempBuffer?.Current()!);
+            this.sceneManager.render(this.jumpFloodingSDFGenerator.resultTexture!);
         });
     }
 
