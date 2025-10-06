@@ -5,6 +5,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     let canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
     if (canvas) {
         let app = new App(canvas);
-        await app.run();
+        await app.Run();
     }
 });
