@@ -341,6 +341,75 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
 
 
 
+fn IsReflectionBoardCollisionEnabled() -> bool
+{
+    return true;
+}
+
+fn IsBottomBoundaryCollisionEnabled() -> bool
+{
+    return true;
+}
+
+fn IsBulletOutOfBottomBound(position: vec2<f32>) -> bool
+{
+    if(IsBottomBoundaryCollisionEnabled())
+    {    
+        return false;
+    }
+
+    return position.y < -2.0;
+}
+
+fn IsPointInBounds(position: vec2<f32>, boundsMin: vec2<f32>, boundsMax: vec2<f32>) -> bool
+{
+    return position.x >= boundsMin.x 
+            && position.x <= boundsMax.x 
+            && position.y >= boundsMin.y 
+            && position.y <= boundsMax.y;
+}
+
+fn IsBulletEnteredDeadZone(position: vec2<f32>) -> bool
+{
+    let tolerance = 20.0;
+    let boundsMin = -vec2<f32>(tolerance, tolerance);
+    let boundsMax = _Uniforms._RenderTargetTexelSize.zw + vec2<f32>(tolerance, tolerance);
+    return !IsPointInBounds(position, boundsMin, boundsMax);
+}
+
+fn IsBulletCollidingBounds(position: vec2<f32>, velocity: vec2<f32>, 
+ reflectedVelocity: ptr<function, vec2<f32>>, correctedPosition: ptr<function, vec2<f32>>) -> bool
+{
+    let tolerance = 15.0;
+    if (abs(position.y - _Uniforms._RenderTargetTexelSize.w) <= tolerance)
+    {
+        *reflectedVelocity = reflect(velocity, vec2<f32>(0, -1));
+        *correctedPosition = vec2<f32>(position.x, _Uniforms._RenderTargetTexelSize.w - tolerance);
+        return true;
+    }
+    if ( IsBottomBoundaryCollisionEnabled() && abs(position.y) <= tolerance)
+    {
+        *reflectedVelocity = reflect(velocity, vec2<f32>(0, 1));
+        *correctedPosition = vec2<f32>(position.x, tolerance);
+        return true;
+    }
+    if (abs(position.x) <= tolerance)
+    {
+        *reflectedVelocity = reflect(velocity, vec2<f32>(-1, 0));
+        *correctedPosition = vec2<f32>(tolerance, position.y);
+        return true;
+    }
+    if (abs(position.x - _Uniforms._RenderTargetTexelSize.z) <= tolerance)
+    {
+        *reflectedVelocity = reflect(velocity, vec2<f32>(1, 0));
+        *correctedPosition = vec2<f32>(_Uniforms._RenderTargetTexelSize.z - tolerance, position.y);
+        return true;
+    }
+    return false;
+}
+
+
+
 @compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
 fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
 {
@@ -355,6 +424,16 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     let deltaTime = _Uniforms._DeltaTime;
 
     particleState.position += particleState.velocity * deltaTime;
+
+    var correctedPosition = vec2<f32>(0.0, 0.0);
+    var reflectedVelocity = vec2<f32>(0.0, 0.0);
+    if (IsBulletCollidingBounds(particleState.position, particleState.velocity, &reflectedVelocity, &correctedPosition))
+    {
+        particleState.position = correctedPosition;
+        particleState.velocity = reflectedVelocity;
+    }
+
+
     WriteParticleState(particleSlotID, particleState);
     WriteParticleActivateState(particleSlotID, particleActivateState);
 
@@ -463,7 +542,7 @@ fn SoftwareRasterizeStaticParticles(@builtin(global_invocation_id) globalId: vec
 
     let id1d = TransformID_2To1_UInt(pixelIndex, textureSize);
     let packedColor = PackColor(particleState.color);
-    atomicStore(&_RasterTargetBuffer_RW[id1d], packedColor);
+    atomicMax(&_RasterTargetBuffer_RW[id1d], packedColor);
 }
 
 
@@ -516,7 +595,7 @@ fn SoftwareRasterizeDynamicParticles(@builtin(global_invocation_id) globalId: ve
             let color = RasterizeDynamicParticle(uv, particleState);
             let packedColor = PackColor(color);
 
-            atomicOr(&_RasterTargetBuffer_RW[u32(texel1D)], packedColor);
+            atomicMax(&_RasterTargetBuffer_RW[u32(texel1D)], packedColor);
         }
     }
 }
