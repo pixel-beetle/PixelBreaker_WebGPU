@@ -39,6 +39,9 @@ export class Application
         this.reflectionUIManager.RegisterTarget('video', this.videoManager, (property: string, value: any) => {
             this.videoManager.handlePropertyChange(property, value);
         });
+        this.reflectionUIManager.RegisterTarget('particleCount', this.pixelBreakerManager.particleCountReadback, (property: string, value: any) => {
+            
+        });
     }
 
     SetUpBabylonDebugLayer(debugOn: boolean = true): void 

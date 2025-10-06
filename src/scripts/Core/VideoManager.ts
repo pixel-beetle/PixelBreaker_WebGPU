@@ -9,7 +9,7 @@ export class VideoManager
     public playPause: boolean = false;
 
     @Slider({ label: 'Volume', min: 0, max: 1, step: 0.01, category: 'Video', order: 1 })
-    public volume: number = 1.0;
+    public volume: number = 0.5;
 
     constructor(private scene: BABYLON.Scene, videoSrc: string) 
     {
@@ -35,6 +35,10 @@ export class VideoManager
                 console.error('视频加载错误:', msg, exception);
             }
         );
+
+        this.videoTexture.onLoadObservable.add(() => {
+            this.SetAudioVolume(this.volume);
+        });
 
         this.videoTexture.uScale = 1.0;
         this.videoTexture.vScale = 1.0;
@@ -92,8 +96,30 @@ export class VideoManager
     {
         if (this.videoTexture) 
         {
+            // Store reference to the underlying HTML5 video element
+            const videoElement = this.videoTexture.video;
+            // Dispose texture
             this.videoTexture.dispose();
+
+            // Remove any <source> elements, etc.
+            while (videoElement.firstChild) 
+            {
+                if (videoElement.lastChild)
+                    videoElement.removeChild(videoElement.lastChild);
+            }
+
+            // Set a blank src
+            videoElement.src = ''
+
+            // Prevent non-important errors in some browsers
+            videoElement.removeAttribute('src')
+
+            // Get certain browsers to let go
+            videoElement.load()
+
+            videoElement.remove()
         }
+
         this.videoTexture = null;
     }
 }

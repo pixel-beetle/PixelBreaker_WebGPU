@@ -93,6 +93,9 @@ struct Uniforms
 @group(0) @binding(8) var<storage, read_write> _RasterTargetBuffer_R: array<atomic<u32>>;
 @group(0) @binding(9) var<storage, read_write> _RasterTargetBuffer_RW: array<atomic<u32>>;
 
+@group(0) @binding(10) var<storage, read_write> _IndirectDispatchArgsBuffer_UpdateDynamicParticles_RW: array<u32>;
+@group(0) @binding(11) var<storage, read_write> _IndirectDispatchArgsBuffer_ConvertStaticParticles_RW: array<u32>;
+@group(0) @binding(12) var<storage, read_write> _IndirectDispatchArgsBuffer_RasterizeParticles_RW: array<u32>;
 
 
 const PARTICLE_ACTIVATE_STATE_STATIC = 0u;
@@ -114,14 +117,39 @@ fn GetCurrentDynamicParticleCount() -> u32
     return atomicLoad(&_ParticleCountBuffer_RW[0]);
 }
 
-fn GetPrevConvertCandidateParticleCount() -> u32
+fn IncrementDynamicParticleCount()
+{
+    atomicAdd(&_ParticleCountBuffer_RW[0], 1u);
+}
+
+fn GetPrevStaticParticleCount() -> u32
 {
     return atomicLoad(&_ParticleCountBuffer_R[1]);
 }
 
-fn GetCurrentConvertCandidateParticleCount() -> u32
+fn GetCurrentStaticParticleCount() -> u32
 {
     return atomicLoad(&_ParticleCountBuffer_RW[1]);
+}
+
+fn IncrementStaticParticleCount()
+{
+    atomicAdd(&_ParticleCountBuffer_RW[1], 1u);
+}
+
+fn GetPrevConvertCandidateParticleCount() -> u32
+{
+    return atomicLoad(&_ParticleCountBuffer_R[2]);
+}
+
+fn GetCurrentConvertCandidateParticleCount() -> u32
+{
+    return atomicLoad(&_ParticleCountBuffer_RW[2]);
+}
+
+fn IncrementConvertCandidateParticleCount()
+{
+    atomicAdd(&_ParticleCountBuffer_RW[2], 1u);
 }
 
 fn UnpackParticleState(packedParticleState: PackedParticleState) -> ParticleState
@@ -199,6 +227,26 @@ fn MarkParticleDynamic(id: u32)
 
 
 const THREAD_GROUP_SIZE_X = 128u;
+
+@compute @workgroup_size(1, 1, 1)
+fn InitialFillParticleCountBuffer(@builtin(global_invocation_id) globalId: vec3<u32>)
+{
+    if (globalId.x != 0u)
+    {
+        return;
+    }
+
+    let staticParticleSpawnRectMinMax = _Uniforms._StaticParticleSpawnRectMinMax;
+    let staticParticleSpawnWidth = u32(staticParticleSpawnRectMinMax.z - staticParticleSpawnRectMinMax.x);
+    let staticParticleSpawnHeight = u32(staticParticleSpawnRectMinMax.w - staticParticleSpawnRectMinMax.y);
+    let staticParticleSpawnCount = staticParticleSpawnWidth * staticParticleSpawnHeight;
+
+    atomicStore(&_ParticleCountBuffer_RW[0], _Uniforms._DynamicParticleInitialCount);
+    atomicStore(&_ParticleCountBuffer_RW[1], staticParticleSpawnCount);
+    atomicStore(&_ParticleCountBuffer_RW[2], 0u);
+}
+
+
 @compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
 fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
 {
@@ -245,7 +293,6 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
         particleState.velocity = vec2<f32>(0.0, 0.0);
         particleState.color = _Uniforms._ReflectionBoardColor;
         particleActivateState = PARTICLE_ACTIVATE_STATE_DYNAMIC;
-        atomicAdd(&_ParticleCountBuffer_RW[0], 1u);
     }
 
     WriteParticleState(particleID, particleState);

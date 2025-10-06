@@ -17,6 +17,11 @@ export class IndirectArgsBuffer
             label);
     }
 
+    public get storageBuffer() : BABYLON.StorageBuffer
+    {
+        return this._storageBuffer!;
+    }
+
     public Release()
     {
         if (this._storageBuffer)

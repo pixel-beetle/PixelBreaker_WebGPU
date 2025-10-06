@@ -6,10 +6,12 @@ export interface UIPropertyOptions {
     hidden?: boolean;
 }
 
-export interface SliderOptions extends UIPropertyOptions {
+export interface NumberOptions extends UIPropertyOptions {
+    options?: { [key: string]: number };
     min?: number;
     max?: number;
     step?: number;
+    format?: (value: number) => string;
 }
 
 export interface ButtonOptions extends UIPropertyOptions {
@@ -66,16 +68,11 @@ export function UIProperty(options: UIPropertyOptions = {}): UIDecorator {
 }
 
 
-export function Slider(options: SliderOptions = {}): UIDecorator {
+export function Slider(options: NumberOptions = {}): UIDecorator {
     return function(target: any, propertyKey: string) {
         AddUIProperty(target, {
             propertyKey,
-            options: {
-                min: 0,
-                max: 1,
-                step: 0.01,
-                ...options
-            },
+            options: options,
             type: 'slider'
         });
     };
@@ -123,7 +120,7 @@ export function List(options: ListOptions): UIDecorator {
     };
 }
 
-export function NumberInput(options: UIPropertyOptions = {}): UIDecorator {
+export function NumberInput(options: NumberOptions = {}): UIDecorator {
     return function(target: any, propertyKey: string) {
         AddUIProperty(target, {
             propertyKey,

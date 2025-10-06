@@ -1,4 +1,4 @@
-import { Pane } from 'tweakpane';
+import { FolderApi, Pane } from 'tweakpane';
 import { UIPropertyMetadata, GetUIProperties } from './UIProperty';
 
 export interface UIBuilderOptions {
@@ -68,7 +68,7 @@ export class UIBuilder
         return groups;
     }
 
-    private CreateFolder(category: string): any {
+    private CreateFolder(category: string): FolderApi {
         if (this.folders.has(category)) {
             return this.folders.get(category);
         }
@@ -82,7 +82,11 @@ export class UIBuilder
         return folder;
     }
 
-    private CreateControl(folder: any, target: any, property: UIPropertyMetadata, onPropertyChange?: (property: string, value: any) => void): void {
+    private CreateControl(folder: FolderApi, 
+        target: any, 
+        property: UIPropertyMetadata, 
+        onPropertyChange?: (property: string, value: any) => void): void 
+    {
         const { propertyKey, options, type } = property;
 
         try {
@@ -114,14 +118,8 @@ export class UIBuilder
         }
     }
 
-    private CreateSlider(folder: any, target: any, propertyKey: string, options: any, onPropertyChange?: Function): void {
-        const slider = folder.addBinding(target, propertyKey, {
-            min: options.min || 0,
-            max: options.max || 1,
-            step: options.step || 0.01,
-            label: options.label || propertyKey,
-            readonly: options.readonly || false
-        });
+    private CreateSlider(folder: FolderApi, target: any, propertyKey: string, options: any, onPropertyChange?: Function): void {
+        const slider = folder.addBinding(target, propertyKey, options);
 
         if (onPropertyChange) {
             slider.on('change', (ev: any) => {
@@ -130,7 +128,7 @@ export class UIBuilder
         }
     }
 
-    private CreateButton(folder: any, target: any, propertyKey: string, options: any, onPropertyChange?: Function): void {
+    private CreateButton(folder: FolderApi, target: any, propertyKey: string, options: any, onPropertyChange?: Function): void {
         const button = folder.addButton({
             title: options.label || propertyKey,
             label: options.text || 'Click'
@@ -143,7 +141,7 @@ export class UIBuilder
         });
     }
 
-    private CreateToggle(folder: any, target: any, propertyKey: string, options: any, onPropertyChange?: Function): void {
+    private CreateToggle(folder: FolderApi, target: any, propertyKey: string, options: any, onPropertyChange?: Function): void {
         const toggle = folder.addBinding(target, propertyKey, {
             label: options.label || propertyKey,
             readonly: options.readonly || false
@@ -156,11 +154,8 @@ export class UIBuilder
         }
     }
 
-    private CreateColor(folder: any, target: any, propertyKey: string, options: any, onPropertyChange?: Function): void {
-        const color = folder.addBinding(target, propertyKey, {
-            label: options.label || propertyKey,
-            readonly: options.readonly || false
-        });
+    private CreateColor(folder: FolderApi, target: any, propertyKey: string, options: any, onPropertyChange?: Function): void {
+        const color = folder.addBinding(target, propertyKey, options);
 
         if (onPropertyChange) {
             color.on('change', (ev: any) => {
@@ -169,12 +164,8 @@ export class UIBuilder
         }
     }
 
-    private CreateList(folder: any, target: any, propertyKey: string, options: any, onPropertyChange?: Function): void {
-        const list = folder.addBinding(target, propertyKey, {
-            options: options.options,
-            label: options.label || propertyKey,
-            readonly: options.readonly || false
-        });
+    private CreateList(folder: FolderApi, target: any, propertyKey: string, options: any, onPropertyChange?: Function): void {
+        const list = folder.addBinding(target, propertyKey, options);
 
         if (onPropertyChange) {
             list.on('change', (ev: any) => {
@@ -183,11 +174,8 @@ export class UIBuilder
         }
     }
 
-    private CreateNumber(folder: any, target: any, propertyKey: string, options: any, onPropertyChange?: Function): void {
-        const number = folder.addBinding(target, propertyKey, {
-            label: options.label || propertyKey,
-            readonly: options.readonly || false
-        });
+    private CreateNumber(folder: FolderApi, target: any, propertyKey: string, options: any, onPropertyChange?: Function): void {
+        const number = folder.addBinding(target, propertyKey, options);
 
         if (onPropertyChange) {
             number.on('change', (ev: any) => {
@@ -196,11 +184,8 @@ export class UIBuilder
         }
     }
 
-    private CreateText(folder: any, target: any, propertyKey: string, options: any, onPropertyChange?: Function): void {
-        const text = folder.addBinding(target, propertyKey, {
-            label: options.label || propertyKey,
-            readonly: options.readonly || false
-        });
+    private CreateText(folder: FolderApi, target: any, propertyKey: string, options: any, onPropertyChange?: Function): void {
+        const text = folder.addBinding(target, propertyKey, options);
 
         if (onPropertyChange) {
             text.on('change', (ev: any) => {

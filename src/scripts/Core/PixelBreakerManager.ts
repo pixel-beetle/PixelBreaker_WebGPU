@@ -7,6 +7,7 @@ import { IndirectArgsBuffer } from "../GfxUtils/IndirectArgsBuffer";
 import { ComputeShaderSet } from "../GfxUtils/ComputeShaderSet";
 import pixelBreakerComputeShader from "../../Shaders/PixelBreaker.compute.wgsl";
 import { SharedTextureSamplerCollection } from "../GfxUtils/SharedTextureSampler";
+import { NumberInput, UIProperty } from '../GUI/UIProperty';
 
 
 class RenderTargetSizeInfo
@@ -35,6 +36,25 @@ class RenderTargetSizeInfo
     }
 }
 
+export class ParticleCountReadbackBuffer
+{
+    public buffer = new Uint32Array(3);
+    
+    @NumberInput({category: "Particle Count", label: "Dynamic", readonly: true, format: (value: number) => { return value.toFixed(); } })
+    public dynamicParticleCount: number = 0;
+    @NumberInput({category: "Particle Count", label: "Static", readonly: true, format: (value: number) => { return value.toFixed(); } })
+    public staticParticleCount: number = 0;
+    @NumberInput({category: "Particle Count", label: "Convert Candidate", readonly: true, format: (value: number) => { return value.toFixed(); } })
+    public convertCandidateParticleCount: number = 0;
+
+    public Update()
+    {
+        this.dynamicParticleCount = this.buffer[0];
+        this.staticParticleCount = this.buffer[1];
+        this.convertCandidateParticleCount = this.buffer[2];
+    }
+}
+
 export class PixelBreakerManager
 {
     // Params
@@ -51,6 +71,7 @@ export class PixelBreakerManager
     public dynamicParticleMaxSpeed: number = 10.0;
     public dynamicParticleSize: number = 2.0;
 
+    public particleCountReadback: ParticleCountReadbackBuffer = new ParticleCountReadbackBuffer();
     
     // Private States
     private _renderTargetSizeInfo: RenderTargetSizeInfo = new RenderTargetSizeInfo();
@@ -150,10 +171,10 @@ export class PixelBreakerManager
 
             if (this._particleCountBuffer)
                 this._particleCountBuffer.Release();
-            // [0] = Dynamic Particle Count, [1] = Convert Candidate Particle Count
+            // [0] = Dynamic Particle Count, [1] = Static Particle Count, [2] = Convert Candidate Particle Count
             this._particleCountBuffer = new DoubleBufferedStorageBuffer(
                 this._engine as BABYLON.WebGPUEngine,
-                2, 
+                3, 
                 BABYLON.Constants.BUFFER_CREATIONFLAG_STORAGE | BABYLON.Constants.BUFFER_CREATIONFLAG_READWRITE,
                 "ParticleCountBuffer"
             );
@@ -310,6 +331,9 @@ export class PixelBreakerManager
         this._uniformBuffer.update();
     }
 
+
+
+
     public Tick(scene: BABYLON.Scene, 
                 engine: BABYLON.AbstractEngine,
                 renderTargetSize: BABYLON.ISize,
@@ -334,13 +358,17 @@ export class PixelBreakerManager
 
         this._particleMemoryBuffer!.Swap();
         this._particleActivateStateBuffer!.Swap();
-        this._particleCountBuffer!.Swap();
+        // this._particleCountBuffer!.Swap();
         this._softwareRasterTargetBuffer!.Swap();
 
         this.DispatchClearParticleCounter();
         this.DispatchConvertStaticParticles();
         this.DispatchUpdateDynamicParticles();
         this.DispatchParticleSoftwareRasterize();
+
+        this._particleCountBuffer?.Current()?.read(0,3 * 4, this.particleCountReadback.buffer).then(() => {
+            this.particleCountReadback.Update();
+        });
     }
 
 
@@ -348,6 +376,9 @@ export class PixelBreakerManager
     private DispatchParticleInitSpawn() : boolean
     {
         if (!this._computeShaderSet)
+            return false;
+        const kInitialFillParticleCountBuffer = this._computeShaderSet.GetKernel("InitialFillParticleCountBuffer");
+        if (!kInitialFillParticleCountBuffer)
             return false;
         const kInitialSpawnParticles = this._computeShaderSet.GetKernel("InitialSpawnParticles");
         if (!kInitialSpawnParticles)
@@ -360,11 +391,14 @@ export class PixelBreakerManager
         const totalSpawnCount = this.dynamicParticleInitialCount + staticParticleSpawnCount;
         console.log("Initial Spawn Count Dynamic: ", this.dynamicParticleInitialCount);
         console.log("Initial Spawn Count Static: ", staticParticleSpawnCount);
-        
+
+        kInitialFillParticleCountBuffer!.cs!.setUniformBuffer("_Uniforms", this._uniformBuffer!);
+        kInitialFillParticleCountBuffer!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
+        kInitialFillParticleCountBuffer!.cs!.dispatch(1, 1, 1);
+
         kInitialSpawnParticles!.cs!.setUniformBuffer("_Uniforms", this._uniformBuffer!);
         kInitialSpawnParticles!.cs!.setStorageBuffer("_ParticleMemoryBuffer_RW", this._particleMemoryBuffer!.Current()!);
         kInitialSpawnParticles!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_RW", this._particleActivateStateBuffer!.Current()!);
-        kInitialSpawnParticles!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
         
         const workGroupSizeX = kInitialSpawnParticles!.workgroupSizeX;
         const canSpawn = kInitialSpawnParticles!.cs!.dispatch((totalSpawnCount + workGroupSizeX - 1) / workGroupSizeX, 1, 1);
@@ -378,16 +412,37 @@ export class PixelBreakerManager
         const kClearParticleCounter = this._computeShaderSet.GetKernel("ClearParticleCounter");
         if (!kClearParticleCounter)
             return;
+
+        kClearParticleCounter!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
+        kClearParticleCounter!.cs!.dispatch(1, 1, 1);
     }
 
+    private DispatchFillIndirectArgs()
+    {
+        if (!this._computeShaderSet)
+            return;
+        const kFillIndirectArgs = this._computeShaderSet.GetKernel("FillIndirectArgs");
+        if (!kFillIndirectArgs)
+            return;
+
+        kFillIndirectArgs!.cs!.setUniformBuffer("_Uniforms", this._uniformBuffer!);
+        kFillIndirectArgs!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
+        kFillIndirectArgs!.cs!.setStorageBuffer("_IndirectDispatchArgsBuffer_UpdateDynamicParticles_RW", this._indirectArgs_UpdateDynamicParticles!.storageBuffer);
+        kFillIndirectArgs!.cs!.setStorageBuffer("_IndirectDispatchArgsBuffer_ConvertStaticParticles_RW", this._indirectArgs_ConvertStaticParticles!.storageBuffer);
+        kFillIndirectArgs!.cs!.setStorageBuffer("_IndirectDispatchArgsBuffer_RasterizeParticles_RW", this._indirectArgs_RasterizeParticles!.storageBuffer);
+        kFillIndirectArgs!.cs!.dispatch(1, 1, 1);
+    }
 
     private DispatchParticleSoftwareRasterize()
     {
         if (!this._computeShaderSet)
             return;
+
         const kSoftwareRasterizeParticles = this._computeShaderSet.GetKernel("SoftwareRasterizeParticles");
         if (!kSoftwareRasterizeParticles)
             return;
+
+
     }
 
 
