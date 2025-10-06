@@ -4,7 +4,8 @@ import { VideoManager } from './scripts/Core/VideoManager';
 import { UIManager } from './scripts/GUI/UIManager';
 import JumpFloodingSDFGenerator from './scripts/Core/JumpFloodingSDFGenerator';
 
-export class VideoApp {
+export class Application 
+{
     private engine: BABYLON.Engine;
     private sceneManager!: SceneManager;
     private videoManager!: VideoManager;
@@ -85,6 +86,7 @@ export class VideoApp {
         this.videoManager.dispose();
         this.sceneManager.dispose();
         this.engine.dispose();
+        this.jumpFloodingSDFGenerator.Release();
     }
 
 }

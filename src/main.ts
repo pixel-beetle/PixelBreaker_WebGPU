@@ -1,4 +1,4 @@
-import { VideoApp as App } from './VideoApp';
+import { Application as App } from './Application';
 
 console.log(`main.ts starting ${App.name}`);
 window.addEventListener('DOMContentLoaded', async () => {

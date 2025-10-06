@@ -166,11 +166,7 @@ fn JFA_Iteration(@builtin(global_invocation_id) globalId: vec3<u32>) {
 fn GetSignedNormalizedDistance(texValue: vec4<f32>) -> f32 
 {
     var normalizedDist = saturate(sqrt(texValue.w) / 1.4142);
-    if (texValue.z == 0) 
-    {
-        normalizedDist = -normalizedDist;
-    }
-    return normalizedDist;
+    return saturate(normalizedDist);
 }
 
 // JFA Generate Distance Field kernel
@@ -194,11 +190,17 @@ fn JFA_GenerateDistanceField(@builtin(global_invocation_id) globalId: vec3<u32>)
     let normalizedDist_Up = GetSignedNormalizedDistance(texValue_Up);
 
     var gradient = vec2<f32>(0.0, 0.0);
-    gradient.x = (normalizedDist_Right - normalizedDist_Left) / _JFA_Uniforms._JFA_TexelSize.x;
-    gradient.y = (normalizedDist_Up - normalizedDist_Down) / _JFA_Uniforms._JFA_TexelSize.y;
+    gradient.x = (normalizedDist_Right - normalizedDist_Left) / (2.0 * _JFA_Uniforms._JFA_TexelSize.x);
+    gradient.y = (normalizedDist_Up - normalizedDist_Down) / (2.0 * _JFA_Uniforms._JFA_TexelSize.y);
 
     gradient = clamp(gradient, vec2<f32>(-1.0), vec2<f32>(1.0));
-    var resultValue = vec4<f32>(gradient * 0.5 + 0.5, normalizedDist_Self * 0.5 + 0.5, 1.0);
-    
+    gradient = mix(gradient, -gradient, texValue_Self.z);
+    var resultValue = vec4<f32>(gradient * 0.5 + 0.5, normalizedDist_Self, 1.0);
+    // var colorInside = mix(vec4<f32>(1.0, 0.0, 0.0, 1.0), vec4<f32>(1.0, 1.0, 0.0, 1.0), 
+    //                                 pow(abs(normalizedDist_Self), 0.3));
+    // var colorOutside = mix(vec4<f32>(1.0, 0.0, 0.0, 1.0), vec4<f32>(1.0, 0.0, 1.0, 1.0), 
+    //                                 pow(abs(normalizedDist_Self), 0.3));
+    // var color = mix(colorInside, colorOutside, texValue_Self.z);
+    // resultValue = color;
     textureStore(_JFA_TempBufferOut, globalId.xy, resultValue);
 }

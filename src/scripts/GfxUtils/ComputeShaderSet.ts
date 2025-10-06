@@ -12,7 +12,7 @@ export class ComputeShaderKernel
     public computeShadersSource: string | null = null;
     public bindings: Record<string, { group: number; binding: number }> | null = null;
 
-    public CreateComputeShader( engine: BABYLON.Engine ) : BABYLON.ComputeShader | null
+    public CreateComputeShader( engine: BABYLON.AbstractEngine ) : BABYLON.ComputeShader | null
     {
         this._computeShader = new BABYLON.ComputeShader(this.name!, engine, 
         { 
@@ -50,7 +50,7 @@ export class ComputeShaderSet
         return this._kernels.get(name) ?? null;
     }
 
-    public static Create(computeShadersSource: string, engine: BABYLON.Engine) : ComputeShaderSet
+    public static Create(computeShadersSource: string, engine: BABYLON.AbstractEngine) : ComputeShaderSet
     {
         const ret = new ComputeShaderSet();
         const shaderReflection = new WgslReflect(computeShadersSource);
