@@ -196,9 +196,10 @@ fn ReadPrevParticleActivateState(id: u32) -> u32
     return _ParticleActivateStateBuffer_R[id];
 }
 
-fn AtomicMarkParticlePreDynamicCandidate(id: u32)
+fn AtomicMarkParticlePreDynamicCandidate(id: u32) -> bool
 {
-    atomicCompareExchangeWeak(&_ParticleActivateStateBuffer_RW[id], PARTICLE_ACTIVATE_STATE_STATIC, PARTICLE_ACTIVATE_STATE_PRE_DYNAMIC);
+    let result = atomicCompareExchangeWeak(&_ParticleActivateStateBuffer_RW[id], PARTICLE_ACTIVATE_STATE_STATIC, PARTICLE_ACTIVATE_STATE_PRE_DYNAMIC);
+    return result.exchanged;
 }
 
 
@@ -275,6 +276,12 @@ fn FillIndirectArgs(@builtin(global_invocation_id) globalId: vec3<u32>)
     _IndirectDispatchArgsBuffer_RW[11] = 1;
 }
 
+
+fn RandomDirection(hash: u32) -> vec2<f32>
+{
+    return normalize(UnpackColor(Hash(hash)).rg * 2.0 - 1.0);
+}
+
 @compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
 fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
 {
@@ -324,7 +331,7 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
 
         particleState.position = reflectionBoardUpperCenterPoint;
 
-        var randomVel = normalize(UnpackColor(Hash(particleSlotID)).rg * 2.0 - 1.0);
+        var randomVel = RandomDirection(particleSlotID);
         randomVel.y = select(randomVel.y, -randomVel.y, randomVel.y < 0.0);
 
         particleState.velocity = _Uniforms._DynamicParticleMaxSpeed * randomVel;
@@ -339,6 +346,18 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
 
 }
 
+
+fn GlobalSpaceToStaticParticleSpace(globalSpace: vec2<i32>) -> vec2<i32>
+{
+    let origin = vec2<i32>(_Uniforms._StaticParticleSpawnRectMinMax.xy);
+    return globalSpace - origin;
+}
+
+fn StaticParticleSpaceToGlobalSpace(staticParticleSpace: vec2<i32>) -> vec2<i32>
+{
+    let origin = vec2<i32>(_Uniforms._StaticParticleSpawnRectMinMax.xy);
+    return origin + vec2<i32>(staticParticleSpace);
+}
 
 
 fn IsReflectionBoardCollisionEnabled() -> bool
@@ -369,7 +388,7 @@ fn IsPointInBounds(position: vec2<f32>, boundsMin: vec2<f32>, boundsMax: vec2<f3
             && position.y <= boundsMax.y;
 }
 
-fn IsBulletEnteredDeadZone(position: vec2<f32>) -> bool
+fn IsParticleEnteredDeadZone(position: vec2<f32>) -> bool
 {
     let tolerance = 20.0;
     let boundsMin = -vec2<f32>(tolerance, tolerance);
@@ -377,10 +396,10 @@ fn IsBulletEnteredDeadZone(position: vec2<f32>) -> bool
     return !IsPointInBounds(position, boundsMin, boundsMax);
 }
 
-fn IsBulletCollidingBounds(position: vec2<f32>, velocity: vec2<f32>, 
+fn IsParticleCollidingSceneBounds(position: vec2<f32>, velocity: vec2<f32>, 
  reflectedVelocity: ptr<function, vec2<f32>>, correctedPosition: ptr<function, vec2<f32>>) -> bool
 {
-    let tolerance = 15.0;
+    let tolerance = 2.0;
     if (abs(position.y - _Uniforms._RenderTargetTexelSize.w) <= tolerance)
     {
         *reflectedVelocity = reflect(velocity, vec2<f32>(0, -1));
@@ -410,6 +429,107 @@ fn IsBulletCollidingBounds(position: vec2<f32>, velocity: vec2<f32>,
 
 
 
+fn IsParticleCollidingReflectionBoard(position: vec2<f32>, velocity: vec2<f32>, 
+    reflectedVelocity: ptr<function, vec2<f32>>) -> bool
+{
+    *reflectedVelocity = velocity;
+    if (!IsReflectionBoardCollisionEnabled())
+    {   
+        return false;
+    }
+    
+    let reflectionBoardMin = _Uniforms._ReflectionBoardRectMinMax.xy;
+    let reflectionBoardMax = _Uniforms._ReflectionBoardRectMinMax.zw;
+    let reflectionBoardExtents = reflectionBoardMax - reflectionBoardMin;
+    let yTolerance = min(2.0, abs(reflectionBoardExtents.y * 0.3));
+    // top
+    if ( abs(position.y - reflectionBoardMax.y) < yTolerance
+        && velocity.y < 0.0 && position.x >= reflectionBoardMin.x && position.x <= reflectionBoardMax.x )
+    {
+        *reflectedVelocity = reflect(velocity, vec2<f32>(0.0, 1.0));
+        return true;
+    }
+    // bottom
+    if ( abs(position.y - reflectionBoardMin.y) < yTolerance
+        && velocity.y > 0.0 && position.x >= reflectionBoardMin.x && position.x <= reflectionBoardMax.x )
+    {
+        *reflectedVelocity = reflect(velocity, vec2<f32>(0.0, -1.0));
+        return true;
+    }
+    // left
+    if ( abs(position.x - reflectionBoardMin.x) < yTolerance
+        && velocity.x > 0.0 && position.y >= reflectionBoardMin.y && position.y <= reflectionBoardMax.y )
+    {
+        *reflectedVelocity = reflect(velocity, vec2<f32>(-1.0, 0.0));
+        return true;
+    }
+    // right
+    if ( abs(position.x - reflectionBoardMax.x) < yTolerance
+        && velocity.x < 0.0 && position.y >= reflectionBoardMin.y && position.y <= reflectionBoardMax.y )
+    {
+        *reflectedVelocity = reflect(velocity, vec2<f32>(1.0, 0.0));
+        return true;
+    }
+    return false;
+}
+
+
+fn IsParticleCollidingStaticParticle(position: vec2<f32>, velocity: vec2<f32>, 
+                        reflectedVelocity: ptr<function, vec2<f32>>, collidedStaticParticleID: ptr<function, u32>,
+                        collidedStaticParticleState: ptr<function, ParticleState>) -> bool
+{
+    let staticParticleSpaceID = GlobalSpaceToStaticParticleSpace(vec2<i32>(position));
+    if (staticParticleSpaceID.x < 0 || staticParticleSpaceID.y < 0)
+    {
+        return false;
+    }
+    if (staticParticleSpaceID.x >= 2 * i32(_Uniforms._StaticParticleSpawnRectMinMax.z) || 
+        staticParticleSpaceID.y >= 2 * i32(_Uniforms._StaticParticleSpawnRectMinMax.w))
+    {
+        return false;
+    }
+    let spawnRectMinMax = _Uniforms._StaticParticleSpawnRectMinMax;
+    let spawnRectSize = vec2<i32>(i32(spawnRectMinMax.z - spawnRectMinMax.x), 
+                                  i32(spawnRectMinMax.w - spawnRectMinMax.y));
+    let staticParticleID1D = TransformID_2To1_Int(staticParticleSpaceID, spawnRectSize);
+    if (staticParticleID1D < 0 || staticParticleID1D >= i32(_Uniforms._TotalParticleCapacity))
+    {
+        return false;
+    }
+    let staticParticleActivateState = ReadPrevParticleActivateState(u32(staticParticleID1D));
+    if (staticParticleActivateState != PARTICLE_ACTIVATE_STATE_STATIC)
+    {
+        return false;
+    }
+
+    if (!AtomicMarkParticlePreDynamicCandidate(u32(staticParticleID1D)))
+    {
+        return false;
+    }
+
+
+    *collidedStaticParticleID = u32(staticParticleID1D);
+    let staticParticleState = ReadPrevParticleState(u32(staticParticleID1D));
+
+    *collidedStaticParticleState = staticParticleState;
+    
+    let randomDirection = normalize(UnpackColor(Hash(u32(staticParticleID1D) + u32(_Uniforms._Time))).rg * 2.0 - 1.0);
+    var newVelocity = reflect(velocity, randomDirection);
+
+    if(abs(newVelocity.y) > abs(newVelocity.x) && newVelocity.y > 0.0)
+    {
+        newVelocity = vec2<f32>(newVelocity.x, -newVelocity.y);
+    }
+    else if(abs(newVelocity.y) < abs(newVelocity.x))
+    {
+        newVelocity = vec2<f32>(-newVelocity.x, newVelocity.y);
+    }
+    *reflectedVelocity = newVelocity;
+    return true;
+}
+
+
+
 @compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
 fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
 {
@@ -423,16 +543,37 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     let particleActivateState = ReadPrevParticleActivateState(particleSlotID);
     let deltaTime = min(0.05, _Uniforms._DeltaTime);
 
-    particleState.position += particleState.velocity * deltaTime;
+    var newVelocity = particleState.velocity;
+    var newPosition = particleState.position + particleState.velocity * deltaTime;
+    var newColor = particleState.color;
 
-    var correctedPosition = vec2<f32>(0.0, 0.0);
-    var reflectedVelocity = vec2<f32>(0.0, 0.0);
-    if (IsBulletCollidingBounds(particleState.position, particleState.velocity, &reflectedVelocity, &correctedPosition))
+    var positionAfterCollision = vec2<f32>(0.0, 0.0);
+    var velocityAfterCollision = vec2<f32>(0.0, 0.0);
+
+
+    if (IsParticleCollidingReflectionBoard(newPosition, newVelocity, &velocityAfterCollision))
     {
-        particleState.position = correctedPosition;
-        particleState.velocity = reflectedVelocity;
+        newVelocity = velocityAfterCollision;
+        newColor = _Uniforms._ReflectionBoardColor;
     }
 
+    if (IsParticleCollidingSceneBounds(newPosition, newVelocity, &velocityAfterCollision, &positionAfterCollision))
+    {
+        newPosition = positionAfterCollision;
+        newVelocity = velocityAfterCollision;
+    }
+
+    var collidedStaticParticleID = 0u;
+    var collidedStaticParticleState = ParticleState();
+    if (IsParticleCollidingStaticParticle(newPosition, newVelocity, &velocityAfterCollision, &collidedStaticParticleID, &collidedStaticParticleState))
+    {
+        newVelocity = velocityAfterCollision;
+        newColor = collidedStaticParticleState.color;
+    }
+
+    particleState.velocity = newVelocity;
+    particleState.position = newPosition;
+    particleState.color = newColor;
 
     WriteParticleState(particleSlotID, particleState);
     WriteParticleActivateState(particleSlotID, particleActivateState);
@@ -462,8 +603,10 @@ fn UpdateStaticParticles_ConvertPreDynamic(@builtin(global_invocation_id) global
     
     particleActivateState = PARTICLE_ACTIVATE_STATE_DYNAMIC;
     // Initialize Velocity Here
-    particleState.velocity = vec2<f32>(0.0, 1.0);
+    var randomVel = RandomDirection(particleSlotID);
+    particleState.velocity = _Uniforms._DynamicParticleMaxSpeed * randomVel;
     particleState.position += particleState.velocity * deltaTime;
+
     var indexInActiveParticleSlotIndexBuffer = IncrementDynamicParticleCount();
     _ActiveDynamicParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
     WriteParticleState(particleSlotID, particleState);
