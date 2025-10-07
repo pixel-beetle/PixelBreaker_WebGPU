@@ -66,7 +66,7 @@ export class ParticleCountReadbackBuffer
 
 
 
-const kStaticParticleColorGradientParams = {
+const kParticleSpawnColorGradientParams = {
     view: 'gradient',
     initialPoints: [ // minimum 2 points
       { time: 0, value: { r: 255, g: 0, b: 255, a: 1 } },
@@ -85,7 +85,7 @@ const kStaticParticleColorGradientParams = {
     timeDecimalPrecision: 4,
   } satisfies GradientBladeParams;
 
-  const kDynamicParticleColorGradientParams = {
+  const kParticleColorBySpeedGradientParams = {
     view: 'gradient',
     initialPoints: [ // minimum 2 points
       { time: 0, value: { r: 255, g: 0, b: 255, a: 1 } },
@@ -149,11 +149,11 @@ export class PixelBreakerParams
     @UIBinding({category: "Dynamic Particle Render", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 0.5, step: 0.001 } })
     public trailFadeRate : number = 0.05;
 
-    @UIGradient({category: "Particle Color", gradientParams: kStaticParticleColorGradientParams })
-    public staticParticleColor: GradientEx = GradientEx.Rainbow(16, 0.3, 0.35);
+    @UIGradient({category: "Particle Color", gradientParams: kParticleSpawnColorGradientParams })
+    public particleSpawnColorGradient: GradientEx = GradientEx.Rainbow(16, 0.3, 0.35);
 
-    @UIGradient({category: "Particle Color", gradientParams: kDynamicParticleColorGradientParams })
-    public dynamicParticleColorBySpeed: GradientEx = GradientEx.Rainbow(16, 0.3, 0.35);
+    @UIGradient({category: "Particle Color", gradientParams: kParticleColorBySpeedGradientParams })
+    public particleColorBySpeedGradient: GradientEx = GradientEx.Rainbow(16, 0.3, 0.35);
 
     @UIBinding({category: "Particle Color", bindingParams: { label: "Color By Speed Remap Range" } })
     public colorBySpeedRamapRange: BABYLON.Vector2 = new BABYLON.Vector2(0, 500);
@@ -223,11 +223,11 @@ export class PixelBreakerParams
             case "trailFadeRate":
                 this.trailFadeRate = value;
                 break;
-            case "staticParticleColor":
-                pixelBreakerManager.staticParticleColorGradientTexture!.UpdateFromTPGradient(value);
+            case "particleSpawnColorGradient":
+                pixelBreakerManager.particleSpawnColorGradientTexture!.UpdateFromTPGradient(value);
                 break;
-            case "dynamicParticleColorBySpeed":
-                pixelBreakerManager.dynamicParticleColorGradientTexture!.UpdateFromTPGradient(value);
+            case "particleColorBySpeedGradient":
+                pixelBreakerManager.particleColorBySpeedGradientTexture!.UpdateFromTPGradient(value);
                 break;
             case "colorBySpeedRamapRange":
                 this.colorBySpeedRamapRange = value;
@@ -245,8 +245,8 @@ export class PixelBreakerManager
     public params: PixelBreakerParams = new PixelBreakerParams();
     public particleCountReadback: ParticleCountReadbackBuffer = new ParticleCountReadbackBuffer();
 
-    public staticParticleColorGradientTexture: GradientTexture | null = null;
-    public dynamicParticleColorGradientTexture: GradientTexture | null = null;
+    public particleSpawnColorGradientTexture: GradientTexture | null = null;
+    public particleColorBySpeedGradientTexture: GradientTexture | null = null;
     
     // Private States
     private _renderTargetSizeInfo: RenderTargetSizeInfo = new RenderTargetSizeInfo();
@@ -441,16 +441,16 @@ export class PixelBreakerManager
             this._renderMaterial = material;
         }
 
-        if (!this.staticParticleColorGradientTexture)
+        if (!this.particleSpawnColorGradientTexture)
         {
-            this.staticParticleColorGradientTexture = new GradientTexture(256, this._scene!);
-            this.staticParticleColorGradientTexture.Update(this.params.staticParticleColor);
+            this.particleSpawnColorGradientTexture = new GradientTexture(256, this._scene!);
+            this.particleSpawnColorGradientTexture.Update(this.params.particleSpawnColorGradient);
         }
 
-        if (!this.dynamicParticleColorGradientTexture)
+        if (!this.particleColorBySpeedGradientTexture)
         {
-            this.dynamicParticleColorGradientTexture = new GradientTexture(256, this._scene!);
-            this.dynamicParticleColorGradientTexture.Update(this.params.dynamicParticleColorBySpeed);
+            this.particleColorBySpeedGradientTexture = new GradientTexture(256, this._scene!);
+            this.particleColorBySpeedGradientTexture.Update(this.params.particleColorBySpeedGradient);
         }
 
         return true;
@@ -487,12 +487,12 @@ export class PixelBreakerManager
 
         if (releaseGradientTextures)
         {
-            if (this.staticParticleColorGradientTexture)
-                this.staticParticleColorGradientTexture.Release();
-            if (this.dynamicParticleColorGradientTexture)
-                this.dynamicParticleColorGradientTexture.Release();
-            this.staticParticleColorGradientTexture = null;
-            this.dynamicParticleColorGradientTexture = null;
+            if (this.particleSpawnColorGradientTexture)
+                this.particleSpawnColorGradientTexture.Release();
+            if (this.particleColorBySpeedGradientTexture)
+                this.particleColorBySpeedGradientTexture.Release();
+            this.particleSpawnColorGradientTexture = null;
+            this.particleColorBySpeedGradientTexture = null;
         }
 
         this._computeUBO = null;
@@ -685,8 +685,7 @@ export class PixelBreakerManager
         kInitialSpawnParticles!.cs!.setStorageBuffer("_ActiveDynamicParticleSlotIndexBuffer_RW", this._activeDynamicParticleSlotIndexBuffer!.Current()!);
         kInitialSpawnParticles!.cs!.setStorageBuffer("_ActiveStaticParticleSlotIndexBuffer_RW", this._activeStaticParticleSlotIndexBuffer!.Current()!);
         
-        kInitialSpawnParticles!.cs!.setTexture("_StaticParticleColorGradientTexture", this.staticParticleColorGradientTexture!.texture!, false);
-        kInitialSpawnParticles!.cs!.setTexture("_DynamicParticleColorGradientTexture", this.dynamicParticleColorGradientTexture!.texture!, false);
+        kInitialSpawnParticles!.cs!.setTexture("_ParticleSpawnColorGradientTexture", this.particleSpawnColorGradientTexture!.texture!, false);
         kInitialSpawnParticles!.cs!.setTextureSampler("_sampler_bilinear_clamp", this._sharedTextureSamplerCollection!.BilinearClamp);
 
         const workGroupSizeX = kInitialSpawnParticles!.workgroupSizeX;
@@ -765,7 +764,7 @@ export class PixelBreakerManager
         kSoftwareRasterizeDynamicParticles!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
         kSoftwareRasterizeDynamicParticles!.cs!.setStorageBuffer("_ActiveDynamicParticleSlotIndexBuffer_R", this._activeDynamicParticleSlotIndexBuffer!.Current()!);
         kSoftwareRasterizeDynamicParticles!.cs!.setStorageBuffer("_RasterTargetBuffer_RW", this._softwareRasterTargetBuffer!.Current()!);
-        kSoftwareRasterizeDynamicParticles!.cs!.setTexture("_DynamicParticleColorGradientTexture", this.dynamicParticleColorGradientTexture!.texture!, false);
+        kSoftwareRasterizeDynamicParticles!.cs!.setTexture("_ParticleColorBySpeedGradientTexture", this.particleColorBySpeedGradientTexture!.texture!, false);
         kSoftwareRasterizeDynamicParticles!.cs!.setTextureSampler("_sampler_bilinear_clamp", this._sharedTextureSamplerCollection!.BilinearClamp);
         kSoftwareRasterizeDynamicParticles!.cs!.dispatchIndirect(this._indirectDispatchArgsBuffer!.storageBuffer, 9 * this._UINT_BYTE_SIZE);
     }
