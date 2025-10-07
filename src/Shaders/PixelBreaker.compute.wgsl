@@ -577,6 +577,13 @@ fn SafeNormalize(v: vec2<f32>) -> vec2<f32>
     return normalize(v);
 }
 
+fn rotate_90_ccw(v: vec2<f32>) -> vec2<f32> {
+    return vec2<f32>(-v.y, v.x);
+}
+
+fn rotate_90_cw(v: vec2<f32>) -> vec2<f32> {
+    return vec2<f32>(v.y, -v.x);
+}
 
 fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f32)
 {
@@ -590,22 +597,31 @@ fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f
     let dfTexSample = SampleDistanceFieldTexture(newPosition);
 
     var dfGradient = dfTexSample.xy * 2.0 - 1.0;
+    dfGradient = SafeNormalize(dfGradient);
 
     let sdf = dfTexSample.z * 2.0 - 1.0;
     let isInsideDf = sdf < 0.0;
     let df = abs(sdf);
 
+    
     if (isInsideDf)
     {
-        let strength = _Uniforms._DistanceFieldForceParams.y
-                       * _Uniforms._RenderTargetTexelSize.zw * 0.25;
-        (*state).velocity += SafeNormalize(dfGradient) * strength * dt;
+        let collisionStrength = _Uniforms._DistanceFieldForceParams.y
+                    * _Uniforms._RenderTargetTexelSize.zw * 0.25;
+        (*state).velocity += dfGradient * collisionStrength * dt;
     }
     else
     {
         if(df < 0.001)
         {
-            (*state).velocity = reflect((*state).velocity, SafeNormalize(dfGradient));
+            (*state).velocity = reflect((*state).velocity, dfGradient);
+        }
+        else
+        {
+            let dfTangent = rotate_90_ccw(dfGradient);
+            let swirlStrength = _Uniforms._DistanceFieldForceParams.z
+                    * _Uniforms._RenderTargetTexelSize.zw * 0.25;
+            (*state).velocity += dfTangent * swirlStrength * dt;
         }
     }
 

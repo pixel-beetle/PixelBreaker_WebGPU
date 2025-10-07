@@ -111,6 +111,16 @@ export class Application
         this.reflectionUIManager.RegisterTarget('video', this.videoManager, (property: string, value: any) => {
             this.videoManager.handlePropertyChange(property, value);
         });
+        this.reflectionUIManager.RegisterTarget('jumpFloodingSDFGenerator', this.jumpFloodingSDFGenerator.params, (property: string, value: any) => {
+            switch (property) {
+                case 'inputValueThreshold':
+                    this.jumpFloodingSDFGenerator.params.inputValueThreshold = value;
+                    break;
+                case 'inputInvert':
+                    this.jumpFloodingSDFGenerator.params.inputInvert = value;
+            }
+        
+        });
         this.reflectionUIManager.RegisterTarget('particleCount', this.pixelBreakerManager.particleCountReadback, (property: string, value: any) => {
             
         });

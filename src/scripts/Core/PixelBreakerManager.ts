@@ -75,16 +75,16 @@ export class PixelBreakerParams
     public dynamicParticleInitialCount: number = 10000;
 
     @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Initial Speed", min:0 } })
-    public dynamicParticleInitialSpeed : number = 100;
+    public dynamicParticleInitialSpeed : number = 500;
 
     @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Max Speed", min:0 } })
-    public dynamicParticleMaxSpeed: number = 100;
+    public dynamicParticleMaxSpeed: number = 500;
 
     @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Use Fixed Speed", min:0 } })
     public dynamicParticleUseFixedSpeed : boolean = false;
 
     @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Fixed Speed", min:0 } })
-    public dynamicParticleFixedSpeed : number = 100;
+    public dynamicParticleFixedSpeed : number = 500;
 
     @UIBinding({category: "Reflection Board", bindingParams: { label: "Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
     public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.25);
@@ -92,7 +92,7 @@ export class PixelBreakerParams
     public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.28);
 
     @UIBinding({category: "Reflection Board", bindingParams: { label: "Color", color : { type: 'float' } } } )
-    public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.8, 0.0, 0.8, 1.0);
+    public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.2, 0.2, 0.8, 1.0);
 
     @UIBinding({category: "Color Change When Hit:", bindingParams: { label: "Reflection Board", min: 0, max: 1, step: 0.01 } })
     public colorChangeWhenCollideWithReflectionBoard : number = 0;
@@ -101,8 +101,10 @@ export class PixelBreakerParams
 
     @UIBinding({category: "SDF Force", bindingParams: { label: "Enable", type: 'boolean' } })
     public useDistanceFieldForce : boolean = false;
-    @UIBinding({category: "SDF Force", bindingParams: { label: "Strength" } })
-    public distanceFieldForceStrength : number = 10;
+    @UIBinding({category: "SDF Force", bindingParams: { label: "Collision Strength" } })
+    public distanceFieldCollisionStrength : number = 10;
+    @UIBinding({category: "SDF Force", bindingParams: { label: "Swirl Strength" } })
+    public distanceFieldSwirlStrength : number = 10;
 
     @UIBinding({category: "Dynamic Particle Render", bindingParams: { label: "Render Size", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
     public dynamicParticleSize: number = 4.0;
@@ -142,7 +144,10 @@ export class PixelBreakerParams
                 this.useDistanceFieldForce = value;
                 break;
             case "distanceFieldForceStrength":
-                this.distanceFieldForceStrength = value;
+                this.distanceFieldCollisionStrength = value;
+                break;
+            case "distanceFieldSwirlStrength":
+                this.distanceFieldSwirlStrength = value;
                 break;
             case "dynamicParticleInitialSpeed":
                 this.dynamicParticleInitialSpeed = value;
@@ -480,7 +485,10 @@ export class PixelBreakerManager
         const colorByCollisionParams = new BABYLON.Vector4(this.params.colorChangeWhenCollideWithReflectionBoard, this.params.colorChangeWhenCollideWithStaticParticle, 0, 0);
         this._computeUBO.updateVector4("_ColorByCollisionParams", colorByCollisionParams);
 
-        const distanceFieldForceParams = new BABYLON.Vector4(this.params.useDistanceFieldForce ? 1 : 0, this.params.distanceFieldForceStrength, 0, 0);
+        const distanceFieldForceParams = new BABYLON.Vector4(this.params.useDistanceFieldForce ? 1 : 0, 
+            this.params.distanceFieldCollisionStrength, 
+            this.params.distanceFieldSwirlStrength, 
+            0);
         this._computeUBO.updateVector4("_DistanceFieldForceParams", distanceFieldForceParams);
 
         this._computeUBO.updateFloat("_TrailFadeRate", this.params.trailFadeRate);

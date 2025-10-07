@@ -3,13 +3,16 @@ import jfaComputeShader from '../../shaders/JumpFlooding2D.compute.wgsl';
 import { DoubleBufferedRawTexture2D } from '../GfxUtils/DoubleBufferUtils';
 import { ComputeShaderSet } from '../GfxUtils/ComputeShaderSet';
 import MathUtils from '../MathUtils/MathUtils';
+import { UIBinding } from '../GUI/UIProperty';
 
-class JFAParamUniforms 
+export class JFAParamUniforms 
 {
     public texelSize: BABYLON.Vector4 = new BABYLON.Vector4(0, 0, 0, 0);
     public jumpDistance: BABYLON.Vector2 = new BABYLON.Vector2(0, 0);
     public inputValueMode: JFAInputValueMode = JFAInputValueMode.RChannel;
+    @UIBinding({category: "SDF Generation", bindingParams: { label: "Input Value Threshold", min: 0, max: 1, step:0.01 } })
     public inputValueThreshold: number = 0.5;
+    @UIBinding({category: "SDF Generation", bindingParams: { label: "Input Invert", type: 'boolean' } })
     public inputInvert: boolean = false;
     public interactSphere: BABYLON.Vector4 = new BABYLON.Vector4(0, 0, 0, 0);
 }
@@ -28,6 +31,10 @@ export default class JumpFloodingSDFGenerator
     private _jfaInputTexture: BABYLON.Texture | null = null;
     private _jfaTempBuffer  : DoubleBufferedRawTexture2D | null = null;
     private _jfaUniforms: JFAParamUniforms = new JFAParamUniforms();
+    public get params() : JFAParamUniforms
+    {
+        return this._jfaUniforms;
+    }
     private _jfaUniformBuffer : BABYLON.UniformBuffer | null = null;
 
     public get resultTexture() : BABYLON.Texture | null
