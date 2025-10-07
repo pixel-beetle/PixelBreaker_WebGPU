@@ -74,12 +74,17 @@ export class PixelBreakerParams
     @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Initial Count", min:0, format: (value: number) => { return value.toFixed(); } } })
     public dynamicParticleInitialCount: number = 10000;
 
+    @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Initial Speed", min:0 } })
+    public dynamicParticleInitialSpeed : number = 100;
+
     @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Max Speed", min:0 } })
     public dynamicParticleMaxSpeed: number = 100;
 
-    @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Size", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
-    public dynamicParticleSize: number = 4.0;
+    @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Use Fixed Speed", min:0 } })
+    public dynamicParticleUseFixedSpeed : boolean = false;
 
+    @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Fixed Speed", min:0 } })
+    public dynamicParticleFixedSpeed : number = 100;
 
     @UIBinding({category: "Reflection Board", bindingParams: { label: "Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
     public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.25);
@@ -89,7 +94,21 @@ export class PixelBreakerParams
     @UIBinding({category: "Reflection Board", bindingParams: { label: "Color", color : { type: 'float' } } } )
     public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.8, 0.0, 0.8, 1.0);
 
+    @UIBinding({category: "Color Change When Hit:", bindingParams: { label: "Reflection Board", min: 0, max: 1, step: 0.01 } })
+    public colorChangeWhenCollideWithReflectionBoard : number = 0;
+    @UIBinding({category: "Color Change When Hit:", bindingParams: { label: "Static Particle", min: 0, max: 1, step: 0.01 } })
+    public colorChangeWhenCollideWithStaticParticle : number = 0;
 
+    @UIBinding({category: "SDF Force", bindingParams: { label: "Enable", type: 'boolean' } })
+    public useDistanceFieldForce : boolean = false;
+    @UIBinding({category: "SDF Force", bindingParams: { label: "Strength" } })
+    public distanceFieldForceStrength : number = 10;
+
+    @UIBinding({category: "Dynamic Particle Render", bindingParams: { label: "Render Size", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
+    public dynamicParticleSize: number = 4.0;
+
+    @UIBinding({category: "Dynamic Particle Render", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 0.5, step: 0.001 } })
+    public trailFadeRate : number = 0.05;
 
     public HandlePropertyChange(property: string, value: any)
     {
@@ -113,11 +132,35 @@ export class PixelBreakerParams
             case "reflectionBoardColor":
                 this.reflectionBoardColor = value;
                 break;
+            case "colorChangeWhenCollideWithReflectionBoard":
+                this.colorChangeWhenCollideWithReflectionBoard = value;
+                break;
+            case "colorChangeWhenCollideWithStaticParticle":
+                this.colorChangeWhenCollideWithStaticParticle = value;
+                break;
+            case "useDistanceFieldForce":
+                this.useDistanceFieldForce = value;
+                break;
+            case "distanceFieldForceStrength":
+                this.distanceFieldForceStrength = value;
+                break;
+            case "dynamicParticleInitialSpeed":
+                this.dynamicParticleInitialSpeed = value;
+                break;
             case "dynamicParticleMaxSpeed":
                 this.dynamicParticleMaxSpeed = value;
                 break;
+            case "dynamicParticleUseFixedSpeed":
+                this.dynamicParticleUseFixedSpeed = value;
+                break;
+            case "dynamicParticleFixedSpeed":
+                this.dynamicParticleFixedSpeed = value;
+                break;
             case "dynamicParticleSize":
                 this.dynamicParticleSize = value;
+                break;
+            case "trailFadeRate":
+                this.trailFadeRate = value;
                 break;
         }
     }
@@ -201,6 +244,11 @@ export class PixelBreakerManager
             this._computeUBO = new UniformBuffer(this._engine);
             this._computeUBO.name = "PixelBreaker UniformBuffer";
             this._computeShaderSet!.InitializeStructUBO(this._computeUBO, 0);
+        }
+
+        if (!this._sharedTextureSamplerCollection)
+        {
+            this._sharedTextureSamplerCollection = new SharedTextureSamplerCollection();
         }
 
         // Rebuild Size Related Resources
@@ -383,8 +431,16 @@ export class PixelBreakerManager
         this._computeUBO.updateVector4("_RenderTargetTexelSize", this._renderTargetSizeInfo.texelSize);
         this._computeUBO.updateUInt("_TotalParticleCapacity", this.params.dynamicParticleInitialCount + this._renderTargetSizeInfo.totalTexelCount);
         this._computeUBO.updateUInt("_DynamicParticleInitialCount", this.params.dynamicParticleInitialCount);
-        this._computeUBO.updateFloat("_DynamicParticleMaxSpeed", this.params.dynamicParticleMaxSpeed);
         this._computeUBO.updateFloat("_DynamicParticleSize", this.params.dynamicParticleSize);
+
+        const dynamicParticleSpeedParams = new BABYLON.Vector4(
+            this.params.dynamicParticleInitialSpeed, 
+            this.params.dynamicParticleMaxSpeed, 
+            this.params.dynamicParticleUseFixedSpeed ? 1 : 0, 
+            this.params.dynamicParticleFixedSpeed
+        );
+
+        this._computeUBO.updateVector4("_DynamicParticleSpeedParams", dynamicParticleSpeedParams);
         
         this._staticParticleSpawnRectMin = new BABYLON.Vector2(
             this.params.staticParticleSpawnRectMin01.x * this._renderTargetSizeInfo.width, 
@@ -420,6 +476,15 @@ export class PixelBreakerManager
         this._computeUBO.updateVector4("_StaticParticleSpawnRectMinMax", staticParticleSpawnRectMinMax);
         this._computeUBO.updateVector4("_ReflectionBoardRectMinMax", reflectionBoardRectMinMax);
         this._computeUBO.updateVector4("_ReflectionBoardColor", reflectionBoardColor);
+
+        const colorByCollisionParams = new BABYLON.Vector4(this.params.colorChangeWhenCollideWithReflectionBoard, this.params.colorChangeWhenCollideWithStaticParticle, 0, 0);
+        this._computeUBO.updateVector4("_ColorByCollisionParams", colorByCollisionParams);
+
+        const distanceFieldForceParams = new BABYLON.Vector4(this.params.useDistanceFieldForce ? 1 : 0, this.params.distanceFieldForceStrength, 0, 0);
+        this._computeUBO.updateVector4("_DistanceFieldForceParams", distanceFieldForceParams);
+
+        this._computeUBO.updateFloat("_TrailFadeRate", this.params.trailFadeRate);
+
         this._computeUBO.update();
     }
 
@@ -477,7 +542,7 @@ export class PixelBreakerManager
 
         this.DispatchClearParticleCounter();
         this.DispatchUpdateStaticParticles();
-        this.DispatchUpdateDynamicParticles();
+        this.DispatchUpdateDynamicParticles(sdfTexture);
         this.DispatchFillIndirectArgs();
         this.DispatchParticleSoftwareRasterize();
         this.UpdateRenderMaterial();
@@ -596,7 +661,7 @@ export class PixelBreakerManager
     }
 
 
-    private DispatchUpdateDynamicParticles()
+    private DispatchUpdateDynamicParticles(sdfTexture: BABYLON.Texture | null)
     {
         if (!this._computeShaderSet)
             return;
@@ -613,6 +678,10 @@ export class PixelBreakerManager
         kUpdateDynamicParticles!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
         kUpdateDynamicParticles!.cs!.setStorageBuffer("_ActiveDynamicParticleSlotIndexBuffer_R", this._activeDynamicParticleSlotIndexBuffer!.Prev()!);
         kUpdateDynamicParticles!.cs!.setStorageBuffer("_ActiveDynamicParticleSlotIndexBuffer_RW", this._activeDynamicParticleSlotIndexBuffer!.Current()!);
+        
+        kUpdateDynamicParticles!.cs!.setTexture("_DistanceFieldTexture", sdfTexture!, false);
+        kUpdateDynamicParticles!.cs!.setTextureSampler("_sampler_bilinear_clamp", this._sharedTextureSamplerCollection!.BilinearClamp);
+
         kUpdateDynamicParticles!.cs!.dispatchIndirect(this._indirectDispatchArgsBuffer!.storageBuffer, 0 * this._UINT_BYTE_SIZE);
     }
 

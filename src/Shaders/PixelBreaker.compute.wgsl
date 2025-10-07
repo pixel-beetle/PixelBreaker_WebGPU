@@ -73,14 +73,25 @@ struct Uniforms
 {
     _Time: f32,
     _DeltaTime: f32,
+
     _RenderTargetTexelSize: vec4<f32>,
+    
     _TotalParticleCapacity: u32,
     _DynamicParticleInitialCount: u32,
-    _DynamicParticleMaxSpeed: f32,
+    
+    _DynamicParticleSpeedParams: vec4<f32>,
     _DynamicParticleSize: f32,
+    
     _StaticParticleSpawnRectMinMax: vec4<f32>,
+    
     _ReflectionBoardRectMinMax: vec4<f32>,
-    _ReflectionBoardColor: vec4<f32>
+    _ReflectionBoardColor: vec4<f32>,
+    
+    _DistanceFieldForceParams: vec4<f32>,
+
+    _ColorByCollisionParams: vec4<f32>,
+
+    _TrailFadeRate: f32,
 }
 
 @group(0) @binding(0) var<uniform> _Uniforms: Uniforms;
@@ -105,6 +116,8 @@ struct Uniforms
 
 @group(0) @binding(13) var<storage, read_write> _IndirectDispatchArgsBuffer_RW: array<u32>;
 
+@group(1) @binding(0) var _sampler_bilinear_clamp: sampler;
+@group(1) @binding(1) var _DistanceFieldTexture: texture_2d<f32>;
 
 const PARTICLE_ACTIVATE_STATE_UNINITIALIZED = 0u;
 const PARTICLE_ACTIVATE_STATE_STATIC = 1u;
@@ -327,14 +340,15 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
         let reflectionBoardHeight = (reflectionBoardRectMinMax.w - reflectionBoardRectMinMax.y);
         let reflectionBoardUpperCenterPoint = reflectionBoardRectMinMax.xy + 
                                                 vec2<f32>(reflectionBoardWidth * 0.5, 
-                                                reflectionBoardHeight * 0.5);
+                                                reflectionBoardHeight);
 
         particleState.position = reflectionBoardUpperCenterPoint;
 
         var randomVel = RandomDirection(particleSlotID);
         randomVel.y = select(randomVel.y, -randomVel.y, randomVel.y < 0.0);
 
-        particleState.velocity = _Uniforms._DynamicParticleMaxSpeed * randomVel;
+        let initialSpeed = _Uniforms._DynamicParticleSpeedParams.x;
+        particleState.velocity = initialSpeed * randomVel;
 
         particleState.color = _Uniforms._ReflectionBoardColor;
         particleActivateState = PARTICLE_ACTIVATE_STATE_DYNAMIC;
@@ -529,6 +543,78 @@ fn IsParticleCollidingStaticParticle(position: vec2<f32>, velocity: vec2<f32>,
 }
 
 
+fn ClampParticleSpeed(velocity: ptr<function, vec2<f32>>)
+{
+    let maxSpeed = _Uniforms._DynamicParticleSpeedParams.y;
+    let useFixedSpeed = _Uniforms._DynamicParticleSpeedParams.z > 0.5;
+    let fixedSpeed = _Uniforms._DynamicParticleSpeedParams.w;
+    let speed = length(*velocity);
+    let direction = normalize(*velocity);
+    if (useFixedSpeed)
+    {
+        *velocity = direction * fixedSpeed;
+    }
+    else
+    {
+        *velocity = direction * min(speed, maxSpeed);
+    }
+}
+
+fn SampleDistanceFieldTexture(statePosition: vec2<f32>) -> vec4<f32>
+{
+    let uv = statePosition * _Uniforms._RenderTargetTexelSize.xy;
+    let dfTexSample = textureSampleLevel(_DistanceFieldTexture, _sampler_bilinear_clamp, uv, 0.0);
+    return dfTexSample;
+}
+
+fn SafeNormalize(v: vec2<f32>) -> vec2<f32>
+{
+    let sqLength = dot(v,v);
+    if(sqLength < f32(1e-7))
+    {
+        return vec2<f32>(0,0);
+    }
+    return normalize(v);
+}
+
+
+fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f32)
+{
+    let useDistanceField = _Uniforms._DistanceFieldForceParams.x > 0.5;
+    if(!useDistanceField)
+    {
+        return;
+    }
+    let newPosition = (*state).position + (*state).velocity * dt;
+    
+    let dfTexSample = SampleDistanceFieldTexture(newPosition);
+
+    var dfGradient = dfTexSample.xy * 2.0 - 1.0;
+
+    let sdf = dfTexSample.z * 2.0 - 1.0;
+    let isInsideDf = sdf < 0.0;
+    let df = abs(sdf);
+
+    if (isInsideDf)
+    {
+        let strength = _Uniforms._DistanceFieldForceParams.y
+                       * _Uniforms._RenderTargetTexelSize.zw * 0.25;
+        (*state).velocity += SafeNormalize(dfGradient) * strength * dt;
+    }
+    else
+    {
+        if(df < 0.001)
+        {
+            (*state).velocity = reflect((*state).velocity, SafeNormalize(dfGradient));
+        }
+    }
+
+
+    let dfForColorBlend = pow(df, 0.3);
+    let colorInside = mix(vec4<f32>(1.0, 1.0, 1.0, 1.0), vec4<f32>(1.0, 0.0, 0.0, 1.0), dfForColorBlend);
+    let colorOutside = mix(vec4<f32>(1.0, 1.0, 1.0, 1.0), vec4<f32>(0.0, 0.0, 1.0, 1.0), dfForColorBlend);
+    let colorByDf = select(colorInside, colorOutside, sdf > 0.0);
+}
 
 @compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
 fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
@@ -543,8 +629,11 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     let particleActivateState = ReadPrevParticleActivateState(particleSlotID);
     let deltaTime = min(0.05, _Uniforms._DeltaTime);
 
+    ApplyParticleMotion_DistanceField(&particleState, deltaTime);
     var newVelocity = particleState.velocity;
-    var newPosition = particleState.position + particleState.velocity * deltaTime;
+    ClampParticleSpeed(&newVelocity);
+
+    var newPosition = particleState.position + newVelocity * deltaTime;
     var newColor = particleState.color;
 
     var positionAfterCollision = vec2<f32>(0.0, 0.0);
@@ -554,7 +643,8 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     if (IsParticleCollidingReflectionBoard(newPosition, newVelocity, &velocityAfterCollision))
     {
         newVelocity = velocityAfterCollision;
-        newColor = _Uniforms._ReflectionBoardColor;
+        let colorTransitionFactor = _Uniforms._ColorByCollisionParams.x;
+        newColor = mix(newColor, _Uniforms._ReflectionBoardColor, colorTransitionFactor);
     }
 
     if (IsParticleCollidingSceneBounds(newPosition, newVelocity, &velocityAfterCollision, &positionAfterCollision))
@@ -568,7 +658,8 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     if (IsParticleCollidingStaticParticle(newPosition, newVelocity, &velocityAfterCollision, &collidedStaticParticleID, &collidedStaticParticleState))
     {
         newVelocity = velocityAfterCollision;
-        newColor = collidedStaticParticleState.color;
+        let colorTransitionFactor = _Uniforms._ColorByCollisionParams.y;
+        newColor = mix(newColor, collidedStaticParticleState.color, colorTransitionFactor);
     }
 
     particleState.velocity = newVelocity;
@@ -604,7 +695,8 @@ fn UpdateStaticParticles_ConvertPreDynamic(@builtin(global_invocation_id) global
     particleActivateState = PARTICLE_ACTIVATE_STATE_DYNAMIC;
     // Initialize Velocity Here
     var randomVel = RandomDirection(particleSlotID);
-    particleState.velocity = _Uniforms._DynamicParticleMaxSpeed * randomVel;
+    let initialSpeed = _Uniforms._DynamicParticleSpeedParams.x;
+    particleState.velocity = initialSpeed * randomVel;
     particleState.position += particleState.velocity * deltaTime;
 
     var indexInActiveParticleSlotIndexBuffer = IncrementDynamicParticleCount();
@@ -653,7 +745,7 @@ fn FadeSoftwareRasterizeTarget(@builtin(global_invocation_id) globalId: vec3<u32
     let id1d = TransformID_2To1_UInt(pixelIndex, textureSize);
     var packedColor = _RasterTargetBuffer_R[id1d];
     var color = UnpackColor(packedColor);
-    color *= 0.95;
+    color *= saturate(1.0 - saturate(_Uniforms._TrailFadeRate));
     color = saturate(color);
 
     packedColor = PackColor(color);
@@ -685,7 +777,7 @@ fn SoftwareRasterizeStaticParticles(@builtin(global_invocation_id) globalId: vec
 
     let id1d = TransformID_2To1_UInt(pixelIndex, textureSize);
     let packedColor = PackColor(particleState.color);
-    atomicMax(&_RasterTargetBuffer_RW[id1d], packedColor);
+    atomicStore(&_RasterTargetBuffer_RW[id1d], packedColor);
 }
 
 

@@ -82,7 +82,7 @@ export default class JumpFloodingSDFGenerator
             this._jfaTempBuffer.width = currentTexSize.width;
             this._jfaTempBuffer.height = currentTexSize.height;
             this._jfaTempBuffer.format = BABYLON.Engine.TEXTUREFORMAT_RGBA;
-            this._jfaTempBuffer.type = BABYLON.Engine.TEXTURETYPE_FLOAT;
+            this._jfaTempBuffer.type = BABYLON.Engine.TEXTURETYPE_HALF_FLOAT;
             this._jfaTempBuffer.samplingMode = BABYLON.Texture.BILINEAR_SAMPLINGMODE;
             this._jfaTempBuffer.creationFlags = BABYLON.Constants.TEXTURE_CREATIONFLAG_STORAGE;
             this._jfaTempBuffer.useSRGBBuffer = false;

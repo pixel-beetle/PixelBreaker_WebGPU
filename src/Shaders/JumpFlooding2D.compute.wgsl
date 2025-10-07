@@ -25,7 +25,7 @@ struct JFAUniforms {
 @group(0) @binding(0) var<uniform> _JFA_Uniforms: JFAUniforms;
 @group(0) @binding(1) var _JFA_InputTexture: texture_2d<f32>;
 @group(0) @binding(2) var _JFA_TempBufferIn: texture_2d<f32>;
-@group(0) @binding(3) var _JFA_TempBufferOut: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(3) var _JFA_TempBufferOut: texture_storage_2d<rgba16float, write>;
 
 // Helper function to get input value based on mode
 fn GetInputValue(sample: vec4<f32>, mode: u32) -> f32 {
@@ -195,7 +195,9 @@ fn JFA_GenerateDistanceField(@builtin(global_invocation_id) globalId: vec3<u32>)
 
     gradient = clamp(gradient, vec2<f32>(-1.0), vec2<f32>(1.0));
     gradient = mix(gradient, -gradient, texValue_Self.z);
-    var resultValue = vec4<f32>(gradient * 0.5 + 0.5, normalizedDist_Self, 1.0);
+    var resultValue = vec4<f32>(gradient * 0.5 + 0.5, 
+                                mix(normalizedDist_Self, -normalizedDist_Self, texValue_Self.z) * 0.5 + 0.5, 
+                                1.0);
     // var colorInside = mix(vec4<f32>(1.0, 0.0, 0.0, 1.0), vec4<f32>(1.0, 1.0, 0.0, 1.0), 
     //                                 pow(abs(normalizedDist_Self), 0.3));
     // var colorOutside = mix(vec4<f32>(1.0, 0.0, 0.0, 1.0), vec4<f32>(1.0, 0.0, 1.0, 1.0), 
