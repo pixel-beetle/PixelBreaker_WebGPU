@@ -5,7 +5,7 @@ export class VideoManager
 {
     public videoTexture: BABYLON.VideoTexture | null = null;
     
-    @UIButton( { category: 'Video', buttonParams: { label: 'Play/Pause', title: 'Play/Pause' } })
+    @UIButton( { category: 'Video', buttonParams: { title: 'Video Play/Pause' } })
     public playPause: boolean = false;
 
     @UIBinding( { category: 'Video', bindingParams: { label: 'Volume', min: 0, max: 1, step: 0.01 } })
@@ -25,11 +25,10 @@ export class VideoManager
             false,
             BABYLON.Texture.TRILINEAR_SAMPLINGMODE,
             { 
-                autoPlay: false,
+                autoPlay: true,
                 loop: true,
                 muted: this.volume === 0,
                 autoUpdateTexture: true,
-                independentVideoSource: true,
             },
             (msg, exception) => {
                 console.error('视频加载错误:', msg, exception);
@@ -62,6 +61,16 @@ export class VideoManager
         }
 
         this.playPause = !videoElement.paused;
+    }
+
+    public Restart(): void 
+    {
+        const videoElement = this.videoTexture?.video;
+        if (!videoElement) 
+            return;
+        videoElement.pause();
+        videoElement.currentTime = 0;
+        videoElement.play();
     }
 
     public SetAudioVolume(volume: number): void 

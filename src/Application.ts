@@ -32,9 +32,9 @@ const kRenderTargetHeightOptions =
 
 export class Application 
 {
-    @UIBinding({category: "Application", bindingParams: { label: "Render Target Width", min: 1, max: 3840, step:1, format: (value: number) => { return value.toFixed(); }, options: kRenderTargetWidthOptions } })
+    @UIBinding({category: "Application", bindingParams: { label: "Resolution X", min: 1, max: 3840, step:1, format: (value: number) => { return value.toFixed(); }, options: kRenderTargetWidthOptions } })
     private renderTargetWidth: number = 1920;
-    @UIBinding({category: "Application", bindingParams: { label: "Render Target Height", min: 1, max: 2160, step:1, format: (value: number) => { return value.toFixed(); }, options: kRenderTargetHeightOptions } })
+    @UIBinding({category: "Application", bindingParams: { label: "Resolution Y", min: 1, max: 2160, step:1, format: (value: number) => { return value.toFixed(); }, options: kRenderTargetHeightOptions } })
     private renderTargetHeight: number = 1080;
     
     private engine: BABYLON.Engine;
@@ -43,6 +43,8 @@ export class Application
     private reflectionUIManager!: ReflectionUIManager;
     private jumpFloodingSDFGenerator!: JumpFloodingSDFGenerator;
     private pixelBreakerManager!: PixelBreakerManager;
+
+    private _isPaused: boolean = false;
 
     constructor(readonly canvas: HTMLCanvasElement) {
         this.engine = new BABYLON.WebGPUEngine(canvas) as any;
@@ -67,6 +69,11 @@ export class Application
         this.jumpFloodingSDFGenerator = new JumpFloodingSDFGenerator();
         this.pixelBreakerManager = new PixelBreakerManager();
 
+        this.RegisterUITargets();
+    }
+
+    private RegisterUITargets(): void
+    {
         this.reflectionUIManager.RegisterTarget('Application', this, (property: string, value: any) => {
             switch (property) {
                 case 'renderTargetWidth':
@@ -77,6 +84,30 @@ export class Application
                     break;
             }
         });
+
+        (this.reflectionUIManager.uiBuilder.folders.get('Application')!.addBlade({
+            view: 'buttongrid',
+            size: [2, 1],
+            cells: (x: number, y: number) => ({
+              title: [
+                ['Play/Pause', 'Reset'],
+              ][y][x],
+            }),
+          }) as any)
+          .on('click', (ev: any) => {
+                if (ev.index[0] === 0)
+                {
+                    this._isPaused = !this._isPaused;
+                    this.videoManager.TogglePlayPause();
+                }
+                else if (ev.index[0] === 1)
+                {
+                    this._isPaused = false;
+                    this.videoManager.Restart();
+                    this.pixelBreakerManager.Reset();
+                }
+          });
+
         this.reflectionUIManager.RegisterTarget('video', this.videoManager, (property: string, value: any) => {
             this.videoManager.handlePropertyChange(property, value);
         });
@@ -108,23 +139,22 @@ export class Application
         
         this.engine.runRenderLoop(() => {
             this.videoManager!.videoTexture!.update();
-            const isVideoPlaying = !this.videoManager!.videoTexture!.video.paused;
-            if (isVideoPlaying)
+
+            if (!this._isPaused)
             {
                 this.jumpFloodingSDFGenerator.Tick(
                     this.sceneManager.scene, 
                     this.engine, 
                     this.videoManager!.videoTexture!);
+                
                 this.pixelBreakerManager.Tick(
-                    this.sceneManager.scene, 
-                    this.engine, 
-                    {width: this.renderTargetWidth, height: this.renderTargetHeight},
-                    this.jumpFloodingSDFGenerator.resultTexture!);
-
-                this.sceneManager.render(this.pixelBreakerManager.renderMaterial!);
+                        this.sceneManager.scene, 
+                        this.engine, 
+                        {width: this.renderTargetWidth, height: this.renderTargetHeight},
+                        this.jumpFloodingSDFGenerator.resultTexture!);
             }
-            
-            
+
+            this.sceneManager.render(this.pixelBreakerManager.renderMaterial!);
         });
     }
 

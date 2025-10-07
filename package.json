@@ -12,6 +12,7 @@
   ],
   "devDependencies": {
     "@tweakpane/core": "^2.0.5",
+    "@tweakpane/plugin-essentials": "^0.2.1",
     "typescript": "^5.3.3",
     "vite": "^5.0.11"
   },

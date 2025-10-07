@@ -1,5 +1,7 @@
 import { BindingParams, FolderApi, Pane } from 'tweakpane';
 import { UIPropertyMetadata, GetUIProperties, ButtonOptions, BindingOptions } from './UIProperty';
+import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
+
 
 export interface UIBuilderOptions {
     title?: string;
@@ -9,16 +11,25 @@ export interface UIBuilderOptions {
 
 export class UIBuilder 
 {
-    private pane: Pane;
-    private folders: Map<string, any> = new Map();
+    private _pane: Pane;
+    public get pane(): Pane 
+    {
+        return this._pane;
+    }
+    private _folders: Map<string, FolderApi> = new Map();
+    public get folders(): Map<string, FolderApi> 
+    {
+        return this._folders;
+    }
     private callbacks: Map<string, Function> = new Map();
 
     constructor(options: UIBuilderOptions = {}) 
     {
-        this.pane = new Pane({
+        this._pane = new Pane({
             title: options.title || 'Control Panel',
             expanded: options.expanded !== false
         });
+        this._pane.registerPlugin(EssentialsPlugin);
     }
 
     public BuildUI(target: any, 
@@ -51,17 +62,19 @@ export class UIBuilder
         return groups;
     }
 
-    private CreateFolder(category: string): FolderApi {
-        if (this.folders.has(category)) {
-            return this.folders.get(category);
+    private CreateFolder(category: string): FolderApi 
+    {
+        if (this._folders.has(category)) 
+        {
+            return this._folders.get(category)!;
         }
 
-        const folder = this.pane.addFolder({
+        const folder = this._pane.addFolder({
             title: category === 'default' ? 'Controls' : category,
             expanded: true
         });
         
-        this.folders.set(category, folder);
+        this._folders.set(category, folder);
         return folder;
     }
 
@@ -108,17 +121,17 @@ export class UIBuilder
      * 获取面板元素
      */
     get element(): HTMLElement {
-        return this.pane.element;
+        return this._pane.element;
     }
 
     /**
      * 销毁UI
      */
     dispose(): void {
-        if (this.pane) {
-            this.pane.dispose();
+        if (this._pane) {
+            this._pane.dispose();
         }
-        this.folders.clear();
+        this._folders.clear();
         this.callbacks.clear();
     }
 }

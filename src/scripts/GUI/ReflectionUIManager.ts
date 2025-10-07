@@ -8,20 +8,24 @@ export interface ReflectionUIManagerOptions extends UIBuilderOptions {
 
 export class ReflectionUIManager 
 {
-    private uiBuilder: UIBuilder;
-    private targets: Map<string, any> = new Map();
-    private refreshTimer?: number;
-    private options: ReflectionUIManagerOptions;
+    private _uiBuilder: UIBuilder;
+    public get uiBuilder(): UIBuilder 
+    {
+        return this._uiBuilder;
+    }
+    private _targets: Map<string, any> = new Map();
+    private _refreshTimer?: number;
+    private _options: ReflectionUIManagerOptions;
 
     constructor(options: ReflectionUIManagerOptions = {}) 
     {
-        this.options = {
+        this._options = {
             autoRefresh: false,
             refreshInterval: 100,
             ...options
         };
 
-        this.uiBuilder = new UIBuilder(options);
+        this._uiBuilder = new UIBuilder(options);
         this.SetupResponsive();
     }
 
@@ -30,7 +34,7 @@ export class ReflectionUIManager
         const mediaQuery = window.matchMedia('(max-width: 768px)');
         const handleResponsive = (e: MediaQueryListEvent | MediaQueryList) => {
             const matches = e.matches;
-            this.uiBuilder.element.style.width = matches ? '300px' : 'auto';
+            this._uiBuilder.element.style.width = matches ? '300px' : 'auto';
         };
         
         mediaQuery.addEventListener('change', handleResponsive);
@@ -40,7 +44,7 @@ export class ReflectionUIManager
 
     public RegisterTarget(name: string, target: any, onPropertyChange?: (property: string, value: any) => void): void 
     {
-        this.targets.set(name, target);
+        this._targets.set(name, target);
         
         const properties = GetUIProperties(target.constructor.prototype);
         
@@ -50,9 +54,9 @@ export class ReflectionUIManager
             return;
         }
 
-        this.uiBuilder.BuildUI(target, properties, { onPropertyChange });
+        this._uiBuilder.BuildUI(target, properties, { onPropertyChange });
 
-        if (this.options.autoRefresh && !this.refreshTimer) 
+        if (this._options.autoRefresh && !this._refreshTimer) 
         {
             this.StartAutoRefresh();
         }
@@ -61,8 +65,8 @@ export class ReflectionUIManager
 
     public UnregisterTarget(name: string): void 
     {
-        this.targets.delete(name);
-        if (this.targets.size === 0 && this.refreshTimer) 
+        this._targets.delete(name);
+        if (this._targets.size === 0 && this._refreshTimer) 
         {
             this.StopAutoRefresh();
         }
@@ -75,39 +79,39 @@ export class ReflectionUIManager
 
     private StartAutoRefresh(): void 
     {
-        if (this.refreshTimer) return;
+        if (this._refreshTimer) return;
 
-        this.refreshTimer = window.setInterval(() => {
+        this._refreshTimer = window.setInterval(() => {
             this.Refresh();
-        }, this.options.refreshInterval);
+        }, this._options.refreshInterval);
     }
 
     private StopAutoRefresh(): void 
     {
-        if (this.refreshTimer) 
+        if (this._refreshTimer) 
         {
-            clearInterval(this.refreshTimer);
-            this.refreshTimer = undefined;
+            clearInterval(this._refreshTimer);
+            this._refreshTimer = undefined;
         }
     }
 
 
     get builder(): UIBuilder 
     {
-        return this.uiBuilder;
+        return this._uiBuilder;
     }
 
 
     get element(): HTMLElement 
     {
-        return this.uiBuilder.element;
+        return this._uiBuilder.element;
     }
 
 
     dispose(): void 
     {
         this.StopAutoRefresh();
-        this.uiBuilder.dispose();
-        this.targets.clear();
+        this._uiBuilder.dispose();
+        this._targets.clear();
     }
 }

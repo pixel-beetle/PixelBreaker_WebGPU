@@ -373,6 +373,14 @@ export class PixelBreakerManager
         this._engine = null;
         this._sharedTextureSamplerCollection = null;
         this._renderTargetSizeInfo = new RenderTargetSizeInfo();
+        this._isInitialiSpawnDone = false;
+        this._time = 0;
+    }
+
+
+    public Reset() : void
+    {
+        this.Release();
     }
 
 
