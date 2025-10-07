@@ -9,7 +9,9 @@ import pixelBreakerComputeShader from "../../Shaders/PixelBreaker.compute.wgsl";
 import pixelBreakerRenderVS from "../../Shaders/PixelBreaker.render.vs.wgsl";
 import pixelBreakerRenderFS from "../../Shaders/PixelBreaker.render.fs.wgsl";
 import { SharedTextureSamplerCollection } from "../GfxUtils/SharedTextureSampler";
-import { UIBinding } from '../GUI/UIProperty';
+import { UIBinding, UIGradient } from '../GUI/UIProperty';
+import { GradientEx, GradientTexture } from '../GfxUtils/ColorGradient';
+import { GradientBladeParams } from 'tweakpane-plugin-gradient';
 
 
 class RenderTargetSizeInfo
@@ -63,6 +65,46 @@ export class ParticleCountReadbackBuffer
 }
 
 
+
+const kStaticParticleColorGradientParams = {
+    view: 'gradient',
+    initialPoints: [ // minimum 2 points
+      { time: 0, value: { r: 255, g: 0, b: 255, a: 1 } },
+      { time: 1, value: { r: 0, g: 255, b: 255, a: 1 } },
+    ],
+    label: 'Static Particle Color',
+    colorPicker: true,
+    colorPickerProps: {
+      alpha: true,
+      layout: 'popup',
+      expanded: false,
+    },
+    alphaPicker: false,
+    timePicker: false,
+    timeStep: 0.001,
+    timeDecimalPrecision: 4,
+  } satisfies GradientBladeParams;
+
+  const kDynamicParticleColorGradientParams = {
+    view: 'gradient',
+    initialPoints: [ // minimum 2 points
+      { time: 0, value: { r: 255, g: 0, b: 255, a: 1 } },
+      { time: 1, value: { r: 0, g: 255, b: 255, a: 1 } },
+    ],
+    label: 'Dynamic Particle Color',
+    colorPicker: true,
+    colorPickerProps: {
+      alpha: true,
+      layout: 'popup',
+      expanded: false,
+    },
+    alphaPicker: false,
+    timePicker: false,
+    timeStep: 0.001,
+    timeDecimalPrecision: 4,
+  } satisfies GradientBladeParams;
+
+
 export class PixelBreakerParams
 {
 
@@ -94,11 +136,6 @@ export class PixelBreakerParams
     @UIBinding({category: "Reflection Board", bindingParams: { label: "Color", color : { type: 'float' } } } )
     public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.2, 0.2, 0.8, 1.0);
 
-    @UIBinding({category: "Color Change When Hit:", bindingParams: { label: "Reflection Board", min: 0, max: 1, step: 0.01 } })
-    public colorChangeWhenCollideWithReflectionBoard : number = 0;
-    @UIBinding({category: "Color Change When Hit:", bindingParams: { label: "Static Particle", min: 0, max: 1, step: 0.01 } })
-    public colorChangeWhenCollideWithStaticParticle : number = 0;
-
     @UIBinding({category: "SDF Force", bindingParams: { label: "Enable", type: 'boolean' } })
     public useDistanceFieldForce : boolean = false;
     @UIBinding({category: "SDF Force", bindingParams: { label: "Collision Strength" } })
@@ -112,7 +149,26 @@ export class PixelBreakerParams
     @UIBinding({category: "Dynamic Particle Render", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 0.5, step: 0.001 } })
     public trailFadeRate : number = 0.05;
 
-    public HandlePropertyChange(property: string, value: any)
+    @UIGradient({category: "Particle Color", gradientParams: kStaticParticleColorGradientParams })
+    public staticParticleColor: GradientEx = GradientEx.Monochrome();
+
+    @UIGradient({category: "Particle Color", gradientParams: kDynamicParticleColorGradientParams })
+    public dynamicParticleColorBySpeed: GradientEx = GradientEx.Monochrome();
+
+    @UIBinding({category: "Particle Color", bindingParams: { label: "Color By Speed Remap Range" } })
+    public colorBySpeedRamapRange: BABYLON.Vector2 = new BABYLON.Vector2(0, 500);
+
+    @UIBinding({category: "Particle Color", bindingParams: { label: "Color By Speed Factor", min: 0, max: 1, step: 0.01 } })
+    public colorBySpeedFactor: number = 1.0;
+
+    @UIBinding({category: "Particle Color", bindingParams: { label: "Sync Reflection Board when hit", min: 0, max: 1, step: 0.01 } })
+    public colorChangeWhenCollideWithReflectionBoard : number = 0;
+    
+    @UIBinding({category: "Particle Color", bindingParams: { label: "Sync Static Particle when hit", min: 0, max: 1, step: 0.01 } })
+    public colorChangeWhenCollideWithStaticParticle : number = 0;
+
+
+    public HandlePropertyChange(property: string, value: any, pixelBreakerManager: PixelBreakerManager)
     {
         switch (property) 
         {
@@ -167,6 +223,18 @@ export class PixelBreakerParams
             case "trailFadeRate":
                 this.trailFadeRate = value;
                 break;
+            case "staticParticleColor":
+                pixelBreakerManager.staticParticleColorGradientTexture!.UpdateFromTPGradient(value);
+                break;
+            case "dynamicParticleColorBySpeed":
+                pixelBreakerManager.dynamicParticleColorGradientTexture!.UpdateFromTPGradient(value);
+                break;
+            case "colorBySpeedRamapRange":
+                this.colorBySpeedRamapRange = value;
+                break;
+            case "colorBySpeedFactor":
+                this.colorBySpeedFactor = value;
+                break;
         }
     }
 }
@@ -176,6 +244,9 @@ export class PixelBreakerManager
     // Params
     public params: PixelBreakerParams = new PixelBreakerParams();
     public particleCountReadback: ParticleCountReadbackBuffer = new ParticleCountReadbackBuffer();
+
+    public staticParticleColorGradientTexture: GradientTexture | null = null;
+    public dynamicParticleColorGradientTexture: GradientTexture | null = null;
     
     // Private States
     private _renderTargetSizeInfo: RenderTargetSizeInfo = new RenderTargetSizeInfo();
@@ -370,6 +441,18 @@ export class PixelBreakerManager
             this._renderMaterial = material;
         }
 
+        if (!this.staticParticleColorGradientTexture)
+        {
+            this.staticParticleColorGradientTexture = new GradientTexture(256, this._scene!);
+            this.staticParticleColorGradientTexture.Update(this.params.staticParticleColor);
+        }
+
+        if (!this.dynamicParticleColorGradientTexture)
+        {
+            this.dynamicParticleColorGradientTexture = new GradientTexture(256, this._scene!);
+            this.dynamicParticleColorGradientTexture.Update(this.params.dynamicParticleColorBySpeed);
+        }
+
         return true;
     }
 
@@ -402,6 +485,11 @@ export class PixelBreakerManager
         if (this._indirectDispatchArgsBuffer)
             this._indirectDispatchArgsBuffer.Release();
 
+        if (this.staticParticleColorGradientTexture)
+            this.staticParticleColorGradientTexture.Release();
+        if (this.dynamicParticleColorGradientTexture)
+            this.dynamicParticleColorGradientTexture.Release();
+
         this._computeUBO = null;
         this._renderUBO = null;
         this._particleMemoryBuffer = null;
@@ -418,6 +506,8 @@ export class PixelBreakerManager
         this._renderTargetSizeInfo = new RenderTargetSizeInfo();
         this._isInitialiSpawnDone = false;
         this._time = 0;
+        this.staticParticleColorGradientTexture = null;
+        this.dynamicParticleColorGradientTexture = null;
     }
 
 
@@ -481,6 +571,8 @@ export class PixelBreakerManager
         this._computeUBO.updateVector4("_StaticParticleSpawnRectMinMax", staticParticleSpawnRectMinMax);
         this._computeUBO.updateVector4("_ReflectionBoardRectMinMax", reflectionBoardRectMinMax);
         this._computeUBO.updateVector4("_ReflectionBoardColor", reflectionBoardColor);
+        const colorBySpeedParams = new BABYLON.Vector4(this.params.colorBySpeedRamapRange.x, this.params.colorBySpeedRamapRange.y, 0, this.params.colorBySpeedFactor);
+        this._computeUBO.updateVector4("_ColorBySpeedParams", colorBySpeedParams);
 
         const colorByCollisionParams = new BABYLON.Vector4(this.params.colorChangeWhenCollideWithReflectionBoard, this.params.colorChangeWhenCollideWithStaticParticle, 0, 0);
         this._computeUBO.updateVector4("_ColorByCollisionParams", colorByCollisionParams);
@@ -589,6 +681,11 @@ export class PixelBreakerManager
         kInitialSpawnParticles!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
         kInitialSpawnParticles!.cs!.setStorageBuffer("_ActiveDynamicParticleSlotIndexBuffer_RW", this._activeDynamicParticleSlotIndexBuffer!.Current()!);
         kInitialSpawnParticles!.cs!.setStorageBuffer("_ActiveStaticParticleSlotIndexBuffer_RW", this._activeStaticParticleSlotIndexBuffer!.Current()!);
+        
+        kInitialSpawnParticles!.cs!.setTexture("_StaticParticleColorGradientTexture", this.staticParticleColorGradientTexture!.texture!, false);
+        kInitialSpawnParticles!.cs!.setTexture("_DynamicParticleColorGradientTexture", this.dynamicParticleColorGradientTexture!.texture!, false);
+        kInitialSpawnParticles!.cs!.setTextureSampler("_sampler_bilinear_clamp", this._sharedTextureSamplerCollection!.BilinearClamp);
+
         const workGroupSizeX = kInitialSpawnParticles!.workgroupSizeX;
         const canSpawn = kInitialSpawnParticles!.cs!.dispatch((totalSpawnCount + workGroupSizeX - 1) / workGroupSizeX, 1, 1);
         return canSpawn;
@@ -665,6 +762,8 @@ export class PixelBreakerManager
         kSoftwareRasterizeDynamicParticles!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
         kSoftwareRasterizeDynamicParticles!.cs!.setStorageBuffer("_ActiveDynamicParticleSlotIndexBuffer_R", this._activeDynamicParticleSlotIndexBuffer!.Current()!);
         kSoftwareRasterizeDynamicParticles!.cs!.setStorageBuffer("_RasterTargetBuffer_RW", this._softwareRasterTargetBuffer!.Current()!);
+        kSoftwareRasterizeDynamicParticles!.cs!.setTexture("_DynamicParticleColorGradientTexture", this.dynamicParticleColorGradientTexture!.texture!, false);
+        kSoftwareRasterizeDynamicParticles!.cs!.setTextureSampler("_sampler_bilinear_clamp", this._sharedTextureSamplerCollection!.BilinearClamp);
         kSoftwareRasterizeDynamicParticles!.cs!.dispatchIndirect(this._indirectDispatchArgsBuffer!.storageBuffer, 9 * this._UINT_BYTE_SIZE);
     }
 

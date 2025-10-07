@@ -1,6 +1,7 @@
 import { BindingParams, FolderApi, Pane } from 'tweakpane';
-import { UIPropertyMetadata, GetUIProperties, ButtonOptions, BindingOptions } from './UIProperty';
+import { UIPropertyMetadata, GetUIProperties, ButtonOptions, BindingOptions, GradientOptions } from './UIProperty';
 import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
+import { GradientBladeApi, GradientPluginBundle } from 'tweakpane-plugin-gradient';
 
 
 export interface UIBuilderOptions {
@@ -30,6 +31,7 @@ export class UIBuilder
             expanded: options.expanded !== false
         });
         this._pane.registerPlugin(EssentialsPlugin);
+        this._pane.registerPlugin(GradientPluginBundle);
     }
 
     public BuildUI(target: any, 
@@ -96,6 +98,16 @@ export class UIBuilder
                     button.on('click', () => {
                         if (onPropertyChange) {
                             onPropertyChange(propertyKey, true);
+                        }
+                    });
+                    break;
+                case 'gradient':
+                    const gradientOptions = options as GradientOptions;
+                    const gradientParams = gradientOptions.gradientParams!;
+                    const gradient = folder.addBlade(gradientParams) as GradientBladeApi;
+                    gradient.on('change', (ev: any) => {
+                        if (onPropertyChange) {
+                            onPropertyChange(propertyKey, ev.value);
                         }
                     });
                     break;

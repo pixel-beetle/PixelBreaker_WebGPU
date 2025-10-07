@@ -125,7 +125,7 @@ export class Application
             
         });
         this.reflectionUIManager.RegisterTarget('pixelBreaker', this.pixelBreakerManager.params, (property: string, value: any) => {
-            this.pixelBreakerManager.params.HandlePropertyChange(property, value);
+            this.pixelBreakerManager.params.HandlePropertyChange(property, value, this.pixelBreakerManager);
         });
     }
 

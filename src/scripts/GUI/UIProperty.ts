@@ -1,5 +1,5 @@
 import { BindingParams, ButtonParams } from "@tweakpane/core";
-
+import { GradientBladeParams } from "tweakpane-plugin-gradient";
 
 export interface UIPropertyOptions 
 {
@@ -18,6 +18,12 @@ export interface ButtonOptions extends UIPropertyOptions
     buttonParams?: ButtonParams;
 }
 
+export interface GradientOptions extends UIPropertyOptions 
+{
+    gradientParams?: GradientBladeParams;
+}
+
+
 export type UIDecorator = (target: any, propertyKey: string) => void;
 
 const UI_PROPERTIES_KEY = 'uiProperties';
@@ -25,7 +31,7 @@ const UI_PROPERTIES_KEY = 'uiProperties';
 export interface UIPropertyMetadata {
     propertyKey: string;
     options: UIPropertyOptions;
-    type: 'binding' | 'button';
+    type: 'binding' | 'button' | 'gradient';
 }
 
 export function GetUIProperties(target: any): UIPropertyMetadata[] {
@@ -61,6 +67,17 @@ export function UIButton(options: ButtonOptions = {}): UIDecorator {
             propertyKey,
             options,
             type: 'button'
+        });
+    };
+}
+
+
+export function UIGradient(options: GradientOptions = {}): UIDecorator {
+    return function(target: any, propertyKey: string) {
+        AddUIProperty(target, {
+            propertyKey,
+            options,
+            type: 'gradient'
         });
     };
 }
