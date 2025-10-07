@@ -100,13 +100,7 @@ export default class JumpFloodingSDFGenerator
         if (!this._jfaUniformBuffer)
         {
             this._jfaUniformBuffer = new BABYLON.UniformBuffer(this._engine);
-            this._jfaUniformBuffer.addUniform("_JFA_TexelSize", 4);
-            this._jfaUniformBuffer.addUniform("_JFA_JumpDistance", 2);
-            this._jfaUniformBuffer.addUniform("_JFA_InputValueMode", 1);
-            this._jfaUniformBuffer.addUniform("_JFA_InputValueThreshold", 1);
-            this._jfaUniformBuffer.addUniform("_JFA_InputInvert", 1);
-            this._jfaUniformBuffer.addUniform("_JFA_InteractSphere", 4);
-            this._jfaUniformBuffer.create();
+            this._jfaComputeShader!.InitializeStructUBO(this._jfaUniformBuffer, 0);
         }
 
         if (!this._jfaComputeShader!.IsAllKernelsReady())

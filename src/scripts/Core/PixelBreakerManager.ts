@@ -190,27 +190,17 @@ export class PixelBreakerManager
             this._renderUBO.addUniform("_ReflectionBoardColor", 4);
             this._renderUBO.create();
         }
+        
+        if(!this._computeShaderSet)
+        {
+            this._computeShaderSet = ComputeShaderSet.Create(pixelBreakerComputeShader, this._engine!);
+        }
 
         if (!this._computeUBO)
         {
             this._computeUBO = new UniformBuffer(this._engine);
             this._computeUBO.name = "PixelBreaker UniformBuffer";
-            this._computeUBO.addUniform("_Time", 1);
-            this._computeUBO.addUniform("_DeltaTime", 1);
-            this._computeUBO.addUniform("_RenderTargetTexelSize", 4);
-            this._computeUBO.addUniform("_TotalParticleCapacity", 1);
-            this._computeUBO.addUniform("_DynamicParticleInitialCount", 1);
-            this._computeUBO.addUniform("_DynamicParticleMaxSpeed", 1);
-            this._computeUBO.addUniform("_DynamicParticleSize", 1);
-            this._computeUBO.addUniform("_StaticParticleSpawnRectMinMax", 4);
-            this._computeUBO.addUniform("_ReflectionBoardRectMinMax", 4);
-            this._computeUBO.addUniform("_ReflectionBoardColor", 4);
-            this._computeUBO.create();
-        }
-        
-        if(!this._computeShaderSet)
-        {
-            this._computeShaderSet = ComputeShaderSet.Create(pixelBreakerComputeShader, this._engine!);
+            this._computeShaderSet!.InitializeStructUBO(this._computeUBO, 0);
         }
 
         // Rebuild Size Related Resources

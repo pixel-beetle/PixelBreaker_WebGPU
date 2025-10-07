@@ -44,6 +44,37 @@ export class ComputeShaderKernel
 export class ComputeShaderSet
 {
     private _kernels: Map<string, ComputeShaderKernel> = new Map();
+    private _shaderReflection: WgslReflect | null = null;
+
+    public InitializeStructUBO(ubo: BABYLON.UniformBuffer, structUboIndexInShader: number = 0)
+    {
+        if (!this._shaderReflection)
+            return;
+        const uniforms = this._shaderReflection.uniforms;
+        if (!uniforms)
+            return;
+
+        let structUbosInShader = [];
+
+        for (let i = 0; i < uniforms.length; i++)
+        {
+            const uniform = uniforms[i];
+            if (!uniform.isStruct || !uniform.members)
+                continue;
+            structUbosInShader.push(uniform);
+        }
+
+        const structUbo = structUbosInShader[structUboIndexInShader];
+        if (!structUbo)
+            return;
+
+        for (const member of structUbo.members!)
+        {
+            const sizeNum32 = member.size / 4;
+            ubo.addUniform(member.name, sizeNum32);
+        }
+        ubo.create();
+    }
 
     public IsAllKernelsReady() : boolean
     {
@@ -66,7 +97,7 @@ export class ComputeShaderSet
         const shaderReflection = new WgslReflect(computeShadersSource);
         const entryPoints = WGSLShaderReflection.ExtractComputeEntryPoints(computeShadersSource);
         const bindGroups = shaderReflection.getBindGroups();
-        
+        ret._shaderReflection = shaderReflection;
 
         for (const entryPoint of entryPoints)
         {
