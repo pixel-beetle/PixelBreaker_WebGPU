@@ -9,7 +9,7 @@ import pixelBreakerComputeShader from "../../Shaders/PixelBreaker.compute.wgsl";
 import pixelBreakerRenderVS from "../../Shaders/PixelBreaker.render.vs.wgsl";
 import pixelBreakerRenderFS from "../../Shaders/PixelBreaker.render.fs.wgsl";
 import { SharedTextureSamplerCollection } from "../GfxUtils/SharedTextureSampler";
-import { NumberInput } from '../GUI/UIProperty';
+import { UIBinding } from '../GUI/UIProperty';
 
 
 class RenderTargetSizeInfo
@@ -42,11 +42,16 @@ export class ParticleCountReadbackBuffer
 {
     public buffer = new Uint32Array(3);
     
-    @NumberInput({category: "Particle Count", label: "Dynamic", readonly: true, format: (value: number) => { return value.toFixed(); } })
+    @UIBinding({category: "Particle Count",
+                bindingParams: { label: "Dynamic", readonly: true, format: (value: number) => { return value.toFixed(); } } })
     public dynamicParticleCount: number = 0;
-    @NumberInput({category: "Particle Count", label: "Static", readonly: true, format: (value: number) => { return value.toFixed(); } })
+
+    @UIBinding({category: "Particle Count", 
+                bindingParams: { label: "Static", readonly: true, format: (value: number) => { return value.toFixed(); } } })
     public staticParticleCount: number = 0;
-    @NumberInput({category: "Particle Count", label: "Convert Candidate", readonly: true, format: (value: number) => { return value.toFixed(); } })
+
+    @UIBinding({category: "Particle Count", 
+                bindingParams: { label: "Convert Candidate", readonly: true, format: (value: number) => { return value.toFixed(); } } })
     public convertCandidateParticleCount: number = 0;
 
     public Update()
@@ -57,22 +62,71 @@ export class ParticleCountReadbackBuffer
     }
 }
 
+
+export class PixelBreakerParams
+{
+
+    @UIBinding({category: "Static Particle", bindingParams: { label: "Spawn Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
+    public staticParticleSpawnRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0, 0.5);
+    @UIBinding({category: "Static Particle", bindingParams: { label: "Spawn Rect Max", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
+    public staticParticleSpawnRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(1, 0.75);
+    
+    @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Initial Count", min:0, format: (value: number) => { return value.toFixed(); } } })
+    public dynamicParticleInitialCount: number = 10000;
+
+    @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Max Speed", min:0 } })
+    public dynamicParticleMaxSpeed: number = 100;
+
+    @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Size", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
+    public dynamicParticleSize: number = 4.0;
+
+
+    @UIBinding({category: "Reflection Board", bindingParams: { label: "Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
+    public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.25);
+    @UIBinding({category: "Reflection Board", bindingParams: { label: "Rect Max", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
+    public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.28);
+
+    @UIBinding({category: "Reflection Board", bindingParams: { label: "Color", color : { type: 'float' } } } )
+    public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.8, 0.0, 0.8, 1.0);
+
+
+
+    public HandlePropertyChange(property: string, value: any)
+    {
+        switch (property) 
+        {
+            case "dynamicParticleInitialCount":
+                this.dynamicParticleInitialCount = value;
+                break;
+            case "staticParticleSpawnRectMin01":
+                this.staticParticleSpawnRectMin01 = value;
+                break;
+            case "staticParticleSpawnRectMax01":
+                this.staticParticleSpawnRectMax01 = value;
+                break;
+            case "reflectionBoardRectMin01":
+                this.reflectionBoardRectMin01 = value;
+                break;
+            case "reflectionBoardRectMax01":
+                this.reflectionBoardRectMax01 = value;
+                break;
+            case "reflectionBoardColor":
+                this.reflectionBoardColor = value;
+                break;
+            case "dynamicParticleMaxSpeed":
+                this.dynamicParticleMaxSpeed = value;
+                break;
+            case "dynamicParticleSize":
+                this.dynamicParticleSize = value;
+                break;
+        }
+    }
+}
+
 export class PixelBreakerManager
 {
     // Params
-    public dynamicParticleInitialCount: number = 10000;
-
-    public staticParticleSpawnRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0, 0.5);
-    public staticParticleSpawnRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(1, 0.75);
-    
-    public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.25);
-    public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.28);
-
-    public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.8, 0.0, 0.8, 1.0);
-
-    public dynamicParticleMaxSpeed: number = 0.1;
-    public dynamicParticleSize: number = 16.0;
-
+    public params: PixelBreakerParams = new PixelBreakerParams();
     public particleCountReadback: ParticleCountReadbackBuffer = new ParticleCountReadbackBuffer();
     
     // Private States
@@ -163,7 +217,7 @@ export class PixelBreakerManager
         if (renderTargetSizeChanged)
         {
             this._isInitialiSpawnDone = false;
-            const TOTAL_PARTICLE_CAPACITY = this.dynamicParticleInitialCount + this._renderTargetSizeInfo.totalTexelCount;
+            const TOTAL_PARTICLE_CAPACITY = this.params.dynamicParticleInitialCount + this._renderTargetSizeInfo.totalTexelCount;
 
             if (this._particleMemoryBuffer)
                 this._particleMemoryBuffer.Release();
@@ -327,28 +381,28 @@ export class PixelBreakerManager
         if (!this._computeUBO)
             return;
         this._computeUBO.updateFloat("_Time", this._time);
-        this._computeUBO.updateFloat("_DeltaTime", this._scene!.deltaTime);
+        this._computeUBO.updateFloat("_DeltaTime", this._scene!.deltaTime * 0.001);
         this._computeUBO.updateVector4("_RenderTargetTexelSize", this._renderTargetSizeInfo.texelSize);
-        this._computeUBO.updateUInt("_TotalParticleCapacity", this.dynamicParticleInitialCount + this._renderTargetSizeInfo.totalTexelCount);
-        this._computeUBO.updateUInt("_DynamicParticleInitialCount", this.dynamicParticleInitialCount);
-        this._computeUBO.updateFloat("_DynamicParticleMaxSpeed", this.dynamicParticleMaxSpeed);
-        this._computeUBO.updateFloat("_DynamicParticleSize", this.dynamicParticleSize);
+        this._computeUBO.updateUInt("_TotalParticleCapacity", this.params.dynamicParticleInitialCount + this._renderTargetSizeInfo.totalTexelCount);
+        this._computeUBO.updateUInt("_DynamicParticleInitialCount", this.params.dynamicParticleInitialCount);
+        this._computeUBO.updateFloat("_DynamicParticleMaxSpeed", this.params.dynamicParticleMaxSpeed);
+        this._computeUBO.updateFloat("_DynamicParticleSize", this.params.dynamicParticleSize);
         
         this._staticParticleSpawnRectMin = new BABYLON.Vector2(
-            this.staticParticleSpawnRectMin01.x * this._renderTargetSizeInfo.width, 
-            this.staticParticleSpawnRectMin01.y * this._renderTargetSizeInfo.height
+            this.params.staticParticleSpawnRectMin01.x * this._renderTargetSizeInfo.width, 
+            this.params.staticParticleSpawnRectMin01.y * this._renderTargetSizeInfo.height
         );
         this._staticParticleSpawnRectMax = new BABYLON.Vector2(
-            this.staticParticleSpawnRectMax01.x * this._renderTargetSizeInfo.width, 
-            this.staticParticleSpawnRectMax01.y * this._renderTargetSizeInfo.height
+            this.params.staticParticleSpawnRectMax01.x * this._renderTargetSizeInfo.width, 
+            this.params.staticParticleSpawnRectMax01.y * this._renderTargetSizeInfo.height
         );
         this._reflectionBoardRectMin = new BABYLON.Vector2(
-            this.reflectionBoardRectMin01.x * this._renderTargetSizeInfo.width, 
-            this.reflectionBoardRectMin01.y * this._renderTargetSizeInfo.height
+            this.params.reflectionBoardRectMin01.x * this._renderTargetSizeInfo.width, 
+            this.params.reflectionBoardRectMin01.y * this._renderTargetSizeInfo.height
         );
         this._reflectionBoardRectMax = new BABYLON.Vector2(
-            this.reflectionBoardRectMax01.x * this._renderTargetSizeInfo.width, 
-            this.reflectionBoardRectMax01.y * this._renderTargetSizeInfo.height
+            this.params.reflectionBoardRectMax01.x * this._renderTargetSizeInfo.width, 
+            this.params.reflectionBoardRectMax01.y * this._renderTargetSizeInfo.height
         );
         
         const staticParticleSpawnRectMinMax = new BABYLON.Vector4(
@@ -364,7 +418,7 @@ export class PixelBreakerManager
             this._reflectionBoardRectMax.x, 
             this._reflectionBoardRectMax.y
         );
-        const reflectionBoardColor = new BABYLON.Vector4(this.reflectionBoardColor.r, this.reflectionBoardColor.g, this.reflectionBoardColor.b, this.reflectionBoardColor.a);
+        const reflectionBoardColor = new BABYLON.Vector4(this.params.reflectionBoardColor.r, this.params.reflectionBoardColor.g, this.params.reflectionBoardColor.b, this.params.reflectionBoardColor.a);
         this._computeUBO.updateVector4("_StaticParticleSpawnRectMinMax", staticParticleSpawnRectMinMax);
         this._computeUBO.updateVector4("_ReflectionBoardRectMinMax", reflectionBoardRectMinMax);
         this._computeUBO.updateVector4("_ReflectionBoardColor", reflectionBoardColor);
@@ -376,7 +430,7 @@ export class PixelBreakerManager
         if (!this._renderUBO)
             return;
 
-        const reflectionBoardColor = new BABYLON.Vector4(this.reflectionBoardColor.r, this.reflectionBoardColor.g, this.reflectionBoardColor.b, this.reflectionBoardColor.a);
+        const reflectionBoardColor = new BABYLON.Vector4(this.params.reflectionBoardColor.r, this.params.reflectionBoardColor.g, this.params.reflectionBoardColor.b, this.params.reflectionBoardColor.a);
         const reflectionBoardRectMinMax = new BABYLON.Vector4(
             this._reflectionBoardRectMin.x, 
             this._reflectionBoardRectMin.y, 
@@ -452,7 +506,7 @@ export class PixelBreakerManager
         const staticParticleSpawnCount = 
                     (this._staticParticleSpawnRectMax.x - this._staticParticleSpawnRectMin.x) 
                     * (this._staticParticleSpawnRectMax.y - this._staticParticleSpawnRectMin.y);
-        const totalSpawnCount = this.dynamicParticleInitialCount + staticParticleSpawnCount;
+        const totalSpawnCount = this.params.dynamicParticleInitialCount + staticParticleSpawnCount;
 
         kInitialFillParticleCountBuffer!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
         kInitialFillParticleCountBuffer!.cs!.setStorageBuffer("_IndirectDispatchArgsBuffer_RW", this._indirectDispatchArgsBuffer!.storageBuffer);

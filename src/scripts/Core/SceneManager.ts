@@ -7,7 +7,8 @@ export class SceneManager
     public camera: BABYLON.FreeCamera;
     public plane: BABYLON.Mesh;
 
-    constructor(private engine: BABYLON.Engine, private canvas: HTMLCanvasElement) 
+    constructor(private engine: BABYLON.Engine, private canvas: HTMLCanvasElement,
+        private aspectRatio: number) 
     {
         this.scene = this.createScene();
         this.camera = this.createCamera();
@@ -24,16 +25,21 @@ export class SceneManager
     private createCamera(): BABYLON.FreeCamera 
     {
         const camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(0, 0, -8), this.scene);
+        camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
+        camera.orthoTop = 0.5;
+        camera.orthoBottom = -0.5;
+        camera.orthoLeft = -0.5 * this.aspectRatio;
+        camera.orthoRight = 0.5 * this.aspectRatio;
         camera.setTarget(BABYLON.Vector3.Zero());
-        camera.attachControl(this.canvas, true);
+        camera.detachControl();
         return camera;
     }
 
     private createPlane(): BABYLON.Mesh 
     {
         const plane = BABYLON.MeshBuilder.CreatePlane("RenderPlane", {
-            width: 10,
-            height: 10 * (9/16) // 16:9 宽高比
+            width: 1 * this.aspectRatio,
+            height: 1
         }, this.scene);
         
         // 调整平面位置使其填满屏幕

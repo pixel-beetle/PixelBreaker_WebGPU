@@ -4,9 +4,39 @@ import { VideoManager } from './scripts/Core/VideoManager';
 import { ReflectionUIManager } from './scripts/GUI/ReflectionUIManager';
 import JumpFloodingSDFGenerator from './scripts/Core/JumpFloodingSDFGenerator';
 import { PixelBreakerManager } from './scripts/Core/PixelBreakerManager';
+import { UIBinding } from './scripts/GUI/UIProperty';
+
+
+const kRenderTargetWidthOptions = 
+{
+    '480': 480,
+    '720': 720,
+    '1080': 1080,
+    '1440': 1440,
+    '1920': 1920,
+    '2160': 2160,
+    '2880': 2880,
+    '3840': 3840,
+}
+
+const kRenderTargetHeightOptions = 
+{
+    '480': 480,
+    '720': 720,
+    '1080': 1080,
+    '1440': 1440,
+    '1920': 1920,
+    '2160': 2160,
+}
+
 
 export class Application 
 {
+    @UIBinding({category: "Application", bindingParams: { label: "Render Target Width", min: 1, max: 3840, step:1, format: (value: number) => { return value.toFixed(); }, options: kRenderTargetWidthOptions } })
+    private renderTargetWidth: number = 1920;
+    @UIBinding({category: "Application", bindingParams: { label: "Render Target Height", min: 1, max: 2160, step:1, format: (value: number) => { return value.toFixed(); }, options: kRenderTargetHeightOptions } })
+    private renderTargetHeight: number = 1080;
+    
     private engine: BABYLON.Engine;
     private sceneManager!: SceneManager;
     private videoManager!: VideoManager;
@@ -31,16 +61,30 @@ export class Application
             refreshInterval: 100
         });
 
-        this.sceneManager = new SceneManager(this.engine, this.canvas);
+
+        this.sceneManager = new SceneManager(this.engine, this.canvas, this.renderTargetWidth / this.renderTargetHeight);
         this.videoManager = new VideoManager(this.sceneManager.scene, './BadApple_Video.mp4');
         this.jumpFloodingSDFGenerator = new JumpFloodingSDFGenerator();
         this.pixelBreakerManager = new PixelBreakerManager();
 
+        this.reflectionUIManager.RegisterTarget('Application', this, (property: string, value: any) => {
+            switch (property) {
+                case 'renderTargetWidth':
+                    this.renderTargetWidth = value;
+                    break;
+                case 'renderTargetHeight':
+                    this.renderTargetHeight = value;
+                    break;
+            }
+        });
         this.reflectionUIManager.RegisterTarget('video', this.videoManager, (property: string, value: any) => {
             this.videoManager.handlePropertyChange(property, value);
         });
         this.reflectionUIManager.RegisterTarget('particleCount', this.pixelBreakerManager.particleCountReadback, (property: string, value: any) => {
             
+        });
+        this.reflectionUIManager.RegisterTarget('pixelBreaker', this.pixelBreakerManager.params, (property: string, value: any) => {
+            this.pixelBreakerManager.params.HandlePropertyChange(property, value);
         });
     }
 
@@ -74,7 +118,7 @@ export class Application
                 this.pixelBreakerManager.Tick(
                     this.sceneManager.scene, 
                     this.engine, 
-                    {width: 1920, height: 1080},
+                    {width: this.renderTargetWidth, height: this.renderTargetHeight},
                     this.jumpFloodingSDFGenerator.resultTexture!);
 
                 this.sceneManager.render(this.pixelBreakerManager.renderMaterial!);

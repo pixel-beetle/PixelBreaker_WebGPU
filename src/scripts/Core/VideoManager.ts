@@ -1,14 +1,14 @@
 import * as BABYLON from 'babylonjs';
-import { Slider, Button } from '../GUI/UIProperty';
+import { UIBinding, UIButton } from '../GUI/UIProperty';
 
 export class VideoManager 
 {
     public videoTexture: BABYLON.VideoTexture | null = null;
     
-    @Button({ text: 'Play/Pause', category: 'Video', order: 1 })
+    @UIButton( { category: 'Video', buttonParams: { label: 'Play/Pause', title: 'Play/Pause' } })
     public playPause: boolean = false;
 
-    @Slider({ label: 'Volume', min: 0, max: 1, step: 0.01, category: 'Video', order: 1 })
+    @UIBinding( { category: 'Video', bindingParams: { label: 'Volume', min: 0, max: 1, step: 0.01 } })
     public volume: number = 0.5;
 
     constructor(private scene: BABYLON.Scene, videoSrc: string) 

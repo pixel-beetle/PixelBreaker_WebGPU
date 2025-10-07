@@ -421,7 +421,7 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     let particleSlotID = _ActiveDynamicParticleSlotIndexBuffer_R[globalId.x];
     var particleState = ReadPrevParticleState(particleSlotID);
     let particleActivateState = ReadPrevParticleActivateState(particleSlotID);
-    let deltaTime = _Uniforms._DeltaTime;
+    let deltaTime = min(0.05, _Uniforms._DeltaTime);
 
     particleState.position += particleState.velocity * deltaTime;
 
@@ -453,7 +453,7 @@ fn UpdateStaticParticles_ConvertPreDynamic(@builtin(global_invocation_id) global
     let particleSlotID = _ActiveStaticParticleSlotIndexBuffer_R[globalId.x];
     var particleState = ReadPrevParticleState(particleSlotID);
     var particleActivateState = ReadPrevParticleActivateState(particleSlotID);
-    let deltaTime = _Uniforms._DeltaTime;
+    let deltaTime = min(0.05, _Uniforms._DeltaTime);
 
     if (particleActivateState != PARTICLE_ACTIVATE_STATE_PRE_DYNAMIC)
     {
