@@ -329,7 +329,9 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
         let staticParticleSpawnID_2D = TransformID_1To2_UInt(particleSlotID, vec2<u32>(staticParticleSpawnWidth, staticParticleSpawnHeight));
         particleState.position = staticParticleSpawnRectMinMax.xy + vec2<f32>(staticParticleSpawnID_2D);
         particleState.velocity = vec2<f32>(0.0, 0.0);
-        let staticParticleColor = textureSampleLevel(_StaticParticleColorGradientTexture, _sampler_bilinear_clamp, vec2<f32>(hashFloat01, 0.5), 0.0);
+
+        let positionUVX = (particleState.position.x - staticParticleSpawnRectMinMax.x) / f32(staticParticleSpawnWidth);
+        let staticParticleColor = textureSampleLevel(_StaticParticleColorGradientTexture, _sampler_bilinear_clamp, vec2<f32>(positionUVX, 0.5), 0.0);
         particleState.color = staticParticleColor;
         particleActivateState = PARTICLE_ACTIVATE_STATE_STATIC;
         var indexInActiveParticleSlotIndexBuffer = IncrementStaticParticleCount();
@@ -860,7 +862,7 @@ fn SoftwareRasterizeDynamicParticles(@builtin(global_invocation_id) globalId: ve
             // uv = uv * 2.0 - 1.0;
 
 
-            atomicMax(&_RasterTargetBuffer_RW[u32(texel1D)], packedColor);
+            atomicStore(&_RasterTargetBuffer_RW[u32(texel1D)], packedColor);
         }
     }
 }

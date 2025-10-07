@@ -109,9 +109,9 @@ export class PixelBreakerParams
 {
 
     @UIBinding({category: "Static Particle", bindingParams: { label: "Spawn Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
-    public staticParticleSpawnRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0, 0.5);
+    public staticParticleSpawnRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.2, 0.3);
     @UIBinding({category: "Static Particle", bindingParams: { label: "Spawn Rect Max", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
-    public staticParticleSpawnRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(1, 0.75);
+    public staticParticleSpawnRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.8, 1.0);
     
     @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Initial Count", min:0, format: (value: number) => { return value.toFixed(); } } })
     public dynamicParticleInitialCount: number = 10000;
@@ -129,17 +129,17 @@ export class PixelBreakerParams
     public dynamicParticleFixedSpeed : number = 500;
 
     @UIBinding({category: "Reflection Board", bindingParams: { label: "Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
-    public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.25);
+    public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.12);
     @UIBinding({category: "Reflection Board", bindingParams: { label: "Rect Max", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
-    public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.28);
+    public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.14);
 
     @UIBinding({category: "Reflection Board", bindingParams: { label: "Color", color : { type: 'float' } } } )
     public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.2, 0.2, 0.8, 1.0);
 
     @UIBinding({category: "SDF Force", bindingParams: { label: "Enable", type: 'boolean' } })
-    public useDistanceFieldForce : boolean = false;
+    public useDistanceFieldForce : boolean = true;
     @UIBinding({category: "SDF Force", bindingParams: { label: "Collision Strength" } })
-    public distanceFieldCollisionStrength : number = 10;
+    public distanceFieldCollisionStrength : number = 100;
     @UIBinding({category: "SDF Force", bindingParams: { label: "Swirl Strength" } })
     public distanceFieldSwirlStrength : number = 10;
 
@@ -150,16 +150,16 @@ export class PixelBreakerParams
     public trailFadeRate : number = 0.05;
 
     @UIGradient({category: "Particle Color", gradientParams: kStaticParticleColorGradientParams })
-    public staticParticleColor: GradientEx = GradientEx.Monochrome();
+    public staticParticleColor: GradientEx = GradientEx.Rainbow(16, 0.3, 0.35);
 
     @UIGradient({category: "Particle Color", gradientParams: kDynamicParticleColorGradientParams })
-    public dynamicParticleColorBySpeed: GradientEx = GradientEx.Monochrome();
+    public dynamicParticleColorBySpeed: GradientEx = GradientEx.Rainbow(16, 0.3, 0.35);
 
     @UIBinding({category: "Particle Color", bindingParams: { label: "Color By Speed Remap Range" } })
     public colorBySpeedRamapRange: BABYLON.Vector2 = new BABYLON.Vector2(0, 500);
 
     @UIBinding({category: "Particle Color", bindingParams: { label: "Color By Speed Factor", min: 0, max: 1, step: 0.01 } })
-    public colorBySpeedFactor: number = 1.0;
+    public colorBySpeedFactor: number = 0.0;
 
     @UIBinding({category: "Particle Color", bindingParams: { label: "Sync Reflection Board when hit", min: 0, max: 1, step: 0.01 } })
     public colorChangeWhenCollideWithReflectionBoard : number = 0;
@@ -456,7 +456,7 @@ export class PixelBreakerManager
         return true;
     }
 
-    public Release()
+    public Release(releaseGradientTextures: boolean = true)
     {
         if (this._computeUBO)
             this._computeUBO.dispose();
@@ -485,10 +485,15 @@ export class PixelBreakerManager
         if (this._indirectDispatchArgsBuffer)
             this._indirectDispatchArgsBuffer.Release();
 
-        if (this.staticParticleColorGradientTexture)
-            this.staticParticleColorGradientTexture.Release();
-        if (this.dynamicParticleColorGradientTexture)
-            this.dynamicParticleColorGradientTexture.Release();
+        if (releaseGradientTextures)
+        {
+            if (this.staticParticleColorGradientTexture)
+                this.staticParticleColorGradientTexture.Release();
+            if (this.dynamicParticleColorGradientTexture)
+                this.dynamicParticleColorGradientTexture.Release();
+            this.staticParticleColorGradientTexture = null;
+            this.dynamicParticleColorGradientTexture = null;
+        }
 
         this._computeUBO = null;
         this._renderUBO = null;
@@ -506,14 +511,12 @@ export class PixelBreakerManager
         this._renderTargetSizeInfo = new RenderTargetSizeInfo();
         this._isInitialiSpawnDone = false;
         this._time = 0;
-        this.staticParticleColorGradientTexture = null;
-        this.dynamicParticleColorGradientTexture = null;
     }
 
 
     public Reset() : void
     {
-        this.Release();
+        this.Release(false);
     }
 
 

@@ -23,24 +23,27 @@ export class GradientEx
     }
 
 
-    public static Monochrome() : GradientEx
+    public static Monochrome(valueStart01: number, valueEnd01: number) : GradientEx
     {
+        const valueStart = valueStart01 * 255;
+        const valueEnd = valueEnd01 * 255;
         const gradient = new GradientEx(new Gradient({
             points: [
-                { time: 0, value: { r: 255, g: 0, b: 255, a: 1 } },
-                { time: 1, value: { r: 0, g: 255, b: 255, a: 1 } },
+                { time: 0, value: { r: valueStart, g: valueStart, b: valueStart, a: 1 } },
+                { time: 1, value: { r: valueEnd, g: valueEnd, b: valueEnd, a: 1 } },
             ],
         }));
         return gradient;
     }
 
-    public static Rainbow(pointCount: number) : GradientEx
+    public static Rainbow(pointCount: number, startHue01: number, endHue01: number) : GradientEx
     {
         let points = [];
         for(let i = 0; i < pointCount; i++)
         {
             const time = i / (pointCount - 1);
-            const color = BABYLON.Color3.FromHSV(time, 1, 1);
+            const hue = startHue01 + (endHue01 - startHue01) * time;
+            const color = BABYLON.Color3.FromHSV(hue * 360, 1, 1);
             points.push({ time: time, value: { r: color.r * 255, g: color.g * 255, b: color.b * 255, a: 1 } });
         }
         const gradient = new Gradient(new Gradient({

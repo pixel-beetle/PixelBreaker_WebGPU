@@ -13,7 +13,7 @@ export class JFAParamUniforms
     @UIBinding({category: "SDF Generation", bindingParams: { label: "Input Value Threshold", min: 0, max: 1, step:0.01 } })
     public inputValueThreshold: number = 0.5;
     @UIBinding({category: "SDF Generation", bindingParams: { label: "Input Invert", type: 'boolean' } })
-    public inputInvert: boolean = false;
+    public inputInvert: boolean = true;
     public interactSphere: BABYLON.Vector4 = new BABYLON.Vector4(0, 0, 0, 0);
 }
 
