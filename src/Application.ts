@@ -284,7 +284,7 @@ export class Application
         );
     }
 
-    private CreatePosterElement(): HTMLElement
+    private CreateNotSupportedHintElement(): HTMLElement
     {
         const posterElement = document.createElement('div');
         posterElement.style.position = 'absolute';
@@ -303,13 +303,62 @@ export class Application
         return posterElement;
     }
 
+    private CreatePosterElement(): HTMLElement
+    {
+        const containerElement = document.createElement('div');
+        containerElement.style.position = 'absolute';
+        containerElement.style.top = '0';
+        containerElement.style.left = '0';
+        containerElement.style.width = '100%';
+        containerElement.style.height = '100%';
+
+        const coverElement = document.createElement('div');
+        coverElement.style.position = 'absolute';
+        coverElement.style.top = '0';
+        coverElement.style.left = '0';
+        coverElement.style.width = '100%';
+        coverElement.style.height = '100%';
+        coverElement.style.backgroundColor = 'rgba(0, 0, 0, 0.75)';
+        coverElement.style.display = 'flex';
+        coverElement.style.justifyContent = 'center';
+        coverElement.style.alignItems = 'center';
+        coverElement.style.color = 'white';
+        coverElement.style.fontSize = '96px';
+        coverElement.style.fontWeight = 'bold';
+        coverElement.style.zIndex = '1000';
+        coverElement.textContent = "CLICK TO START";
+        // add a poster image under the text
+        const imageElement = document.createElement('img');
+        imageElement.style.position = 'absolute';
+        imageElement.style.top = '0';
+        imageElement.style.left = '0';
+        imageElement.style.width = '100%';
+        imageElement.style.height = '100%';
+        imageElement.src = './poster.png';
+        imageElement.alt = 'poster';
+
+        imageElement.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        imageElement.style.display = 'flex';
+        imageElement.style.justifyContent = 'center';
+        imageElement.style.alignItems = 'center';
+        imageElement.style.color = 'white';
+        imageElement.style.fontSize = '96px';
+        imageElement.style.fontWeight = 'bold';
+        imageElement.style.zIndex = '10';
+
+        containerElement.appendChild(imageElement);
+        containerElement.appendChild(coverElement);
+        
+        return containerElement;
+    }
+
     async Run(): Promise<void> 
     {
         const webGPUSupport = await BABYLON.WebGPUEngine.IsSupportedAsync;
         if (!webGPUSupport)
         {
-            this._posterElement = this.CreatePosterElement();
-            this._posterElement.innerHTML = "WebGPU not supported";
+            this._posterElement = this.CreateNotSupportedHintElement();
+            this._posterElement.innerHTML = "WebGPU NOT SUPPORTED";
             document.body.appendChild(this._posterElement);
             console.error("WebGPU is not supported, please use a browser that supports WebGPU, try Chrome or Edge.");
             return;
@@ -318,7 +367,6 @@ export class Application
         {
             // ask for first interaction
             this._posterElement = this.CreatePosterElement();
-            this._posterElement.innerHTML = "Click to start";
             document.body.appendChild(this._posterElement);
             this._posterElement.addEventListener('click', () => {
                 this._posterElement!.remove();
