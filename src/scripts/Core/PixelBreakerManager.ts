@@ -114,7 +114,7 @@ export class PixelBreakerParticlesParams
     @UIBinding({containerPath: "#T/%Spawn/@Static Particle", bindingParams: { label: "Spawn Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
     public staticParticleSpawnRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.2, 0.2);
     @UIBinding({containerPath: "#T/%Spawn/@Static Particle", bindingParams: { label: "Spawn Rect Max", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
-    public staticParticleSpawnRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.8, 1.0);
+    public staticParticleSpawnRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.8, 0.99);
     
     @UIBinding({containerPath: "#T/%Spawn/@Dynamic Particle", bindingParams: { label: "Spawn Count", min:0, format: (value: number) => { return value.toFixed(); } } })
     public dynamicParticleInitialCount: number = 1000000;
@@ -124,6 +124,9 @@ export class PixelBreakerParticlesParams
 
     @UIGradient({containerPath: "#T/%Spawn/@Color", label: "Particle Spawn Color" })
     public particleSpawnColorGradient: Gradient = GradientUtils.HSV(24);
+
+    @UIBinding({containerPath: "#T/%Spawn/@Color", bindingParams: { label: "Particle Color Tint", color : { type: 'float' } } } )
+    public particleColorTint: BABYLON.Color4 = new BABYLON.Color4(1.0, 1.0, 1.0, 1.0);
 
     @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Max Speed", min:0 } })
     public dynamicParticleMaxSpeed: number = 800;
@@ -154,20 +157,30 @@ export class PixelBreakerParticlesParams
     @UIBinding({containerPath: "#T/%Update/@Color Change when Collide With", bindingParams: { label: "Static Particles", min: 0, max: 1, step: 0.01 } })
     public colorChangeWhenCollideWithStaticParticle : number = 0;
 
-    @UIBinding({containerPath: "#T/%Render", bindingParams: { label: "Render Size", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
+    @UIBinding({containerPath: "#T/%Render/@Size", bindingParams: { label: "Render Size", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
     public dynamicParticleSize: number = 3;
 
-    @UIBinding({containerPath: "#T/%Render", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 0.8, step: 0.001 } })
+    @UIBinding({containerPath: "#T/%Render/@Trail", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 0.8, step: 0.001 } })
     public trailFadeRate : number = 0.2;
 
+    @UIBinding({containerPath: "#T/%Render/@Blend", bindingParams: { label: "Particle Blend Mode", min: 0, max: 5, options:{
+        "Stable Sort": 0,
+        "Random": 1,
+        "Additive": 2,
+    } , format: (value: number) => { return value.toFixed(); } } })
+    public particleBlendMode: number = 0;
+    @UIBinding({containerPath: "#T/%Render/@Blend", bindingParams: { label: "Sorting Peak Count", min: 1, max: 10, step: 1, format: (value: number) => { return value.toFixed(); } } })
+    public sortingPeakCount: number = 3;
+    @UIBinding({containerPath: "#T/%Render/@Blend", bindingParams: { label: "Sorting Shift Speed", min: 0.00001, max: 0.001, step: 0.00001 } })
+    public sortingShiftSpeed: number = 0.0003;
 
-    @UIGradient({containerPath: "#T/%Render/@Speed Visualize", label: "Color By Speed Gradient" })
+    @UIGradient({containerPath: "#T/%Render/@Speed Visualize", label: "Color Gradient" })
     public particleColorBySpeedGradient: Gradient = GradientUtils.HSV(24);
 
-    @UIBinding({containerPath: "#T/%Render/@Speed Visualize", bindingParams: { label: "Color By Speed Remap Range" } })
+    @UIBinding({containerPath: "#T/%Render/@Speed Visualize", bindingParams: { label: "Remap Range" } })
     public colorBySpeedRamapRange: BABYLON.Vector2 = new BABYLON.Vector2(0, 500);
 
-    @UIBinding({containerPath: "#T/%Render/@Speed Visualize", bindingParams: { label: "Color By Speed Factor", min: 0, max: 1, step: 0.01 } })
+    @UIBinding({containerPath: "#T/%Render/@Speed Visualize", bindingParams: { label: "Factor", min: 0, max: 1, step: 0.01 } })
     public colorBySpeedFactor: number = 0.0;
 
 
@@ -220,6 +233,9 @@ export class PixelBreakerParticlesParams
             case "particleSpawnColorGradient":
                 pixelBreakerManager.particleSpawnColorGradientTexture!.UpdateFromTPGradient(value);
                 break;
+            case "particleColorTint":
+                this.particleColorTint = value;
+                break;
             case "particleColorBySpeedGradient":
                 pixelBreakerManager.particleColorBySpeedGradientTexture!.UpdateFromTPGradient(value);
                 break;
@@ -234,6 +250,15 @@ export class PixelBreakerParticlesParams
                 break;
             case "forceByColorChangeSpeed":
                 this.forceByColorChangeSpeed = value;
+                break;
+            case "particleBlendMode":
+                this.particleBlendMode = value;
+                break;
+            case "sortingPeakCount":
+                this.sortingPeakCount = value;
+                break;
+            case "sortingShiftSpeed":
+                this.sortingShiftSpeed = value;
                 break;
         }
     }
@@ -591,6 +616,15 @@ export class PixelBreakerManager
 
         const forceByColorParams = new BABYLON.Vector4(this.params.forceByColorStrength, this.params.forceByColorChangeSpeed, 0, 0);
         this._computeUBO.updateVector4("_ForceByColorParams", forceByColorParams);
+
+        const softwareRasterizeSortingParams = new BABYLON.Vector4(
+            this.params.sortingPeakCount, 
+            this.params.sortingShiftSpeed, 
+            this.params.particleBlendMode, 
+            0);
+        this._computeUBO.updateVector4("_SoftwareRasterizeSortingParams", softwareRasterizeSortingParams);
+        const particleColorTint = new BABYLON.Vector4(this.params.particleColorTint.r, this.params.particleColorTint.g, this.params.particleColorTint.b, this.params.particleColorTint.a);
+        this._computeUBO.updateVector4("_ParticleColorTint", particleColorTint);
 
         this._computeUBO.update();
     }

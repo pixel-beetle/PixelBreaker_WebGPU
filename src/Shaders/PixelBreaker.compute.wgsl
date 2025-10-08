@@ -78,6 +78,8 @@ struct Uniforms
     
     _TotalParticleCapacity: u32,
     _DynamicParticleInitialCount: u32,
+
+    _ParticleColorTint: vec4<f32>,
     
     _DynamicParticleSpeedParams: vec4<f32>,
     _DynamicParticleSize: f32,
@@ -94,6 +96,7 @@ struct Uniforms
     _ColorBySpeedParams: vec4<f32>, // xy:remap range, w:enable
 
     _TrailFadeRate: f32,
+    _SoftwareRasterizeSortingParams: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> _Uniforms: Uniforms;
@@ -322,7 +325,7 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
                                       vec4<f32>(1.0, 1.0, 1.0, 1.0));
     var particleActivateState = PARTICLE_ACTIVATE_STATE_STATIC;
 
-    let hashFloat01 = f32(Hash(particleSlotID + u32(_Uniforms._Time))) / 4294967296.0;
+    var particleStableRandom = f32(Hash(particleSlotID + u32(_Uniforms._Time))) / 4294967296.0;
 
     // Static Particle Spawn, As Bricks
     if (isStaticParticleSpawn) 
@@ -332,9 +335,17 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
         particleState.velocity = vec2<f32>(0.0, 0.0);
 
         let positionUVX = (particleState.position.x - staticParticleSpawnRectMinMax.x) / f32(staticParticleSpawnWidth);
-        let staticParticleColor = textureSampleLevel(_ParticleSpawnColorGradientTexture, _sampler_bilinear_clamp, vec2<f32>(positionUVX, 0.5), 0.0);
-        particleState.color = staticParticleColor;
-        particleActivateState = PARTICLE_ACTIVATE_STATE_STATIC;
+        particleStableRandom = saturate(positionUVX);
+        var sampledColor = textureSampleLevel(_ParticleSpawnColorGradientTexture, 
+                                              _sampler_bilinear_clamp, 
+                                              vec2<f32>(particleStableRandom, 0.5), 
+                                              0.0);
+        var tintedColorRGB = sampledColor.rgb * _Uniforms._ParticleColorTint.rgb;
+        tintedColorRGB = mix(sampledColor.rgb, 
+                             tintedColorRGB, 
+                             saturate(_Uniforms._ParticleColorTint.a));
+
+        particleState.color = vec4<f32>(tintedColorRGB, particleStableRandom);        particleActivateState = PARTICLE_ACTIVATE_STATE_STATIC;
         var indexInActiveParticleSlotIndexBuffer = IncrementStaticParticleCount();
         _ActiveStaticParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
         WriteParticleState(particleSlotID, particleState);
@@ -352,14 +363,22 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
 
         particleState.position = reflectionBoardUpperCenterPoint;
 
-        var randomVel = RandomDirection(particleSlotID);
+        var randomVel = RandomDirection(Hash(particleSlotID + u32(_Uniforms._Time)));
         randomVel.y = select(randomVel.y, -randomVel.y, randomVel.y < 0.0);
 
         let initialSpeed = _Uniforms._DynamicParticleSpeedParams.x;
         particleState.velocity = initialSpeed * randomVel;
 
-        let dynamicParticleColor = textureSampleLevel(_ParticleSpawnColorGradientTexture, _sampler_bilinear_clamp, vec2<f32>(hashFloat01, 0.5), 0.0);
-        particleState.color = dynamicParticleColor;
+        var sampledColor = textureSampleLevel(_ParticleSpawnColorGradientTexture, 
+                                              _sampler_bilinear_clamp, 
+                                              vec2<f32>(particleStableRandom, 0.5), 
+                                              0.0);
+        var tintedColorRGB = sampledColor.rgb * _Uniforms._ParticleColorTint.rgb;
+        tintedColorRGB = mix(sampledColor.rgb, 
+                             tintedColorRGB, 
+                             saturate(_Uniforms._ParticleColorTint.a));
+
+        particleState.color = vec4<f32>(tintedColorRGB, particleStableRandom);
         particleActivateState = PARTICLE_ACTIVATE_STATE_DYNAMIC;
         var indexInActiveParticleSlotIndexBuffer = IncrementDynamicParticleCount();
         _ActiveDynamicParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
@@ -644,10 +663,12 @@ fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f
 
 fn ApplyParticleMotion_ForceByColor(state : ptr<function, ParticleState>, dt: f32)
 {
-    let color = state.color;
-    let forceDir = normalize(vec2<f32>(color.r, color.b) * 2.0 - 1.0);
-    let forceStrength = _Uniforms._ForceByColorParams.x 
-                      * sin(_Uniforms._Time * _Uniforms._ForceByColorParams.y)
+    let particleStableRandom = state.color.a;
+    let sinPhase = particleStableRandom + _Uniforms._Time * _Uniforms._ForceByColorParams.y;
+    let forceDirX = cos(sinPhase);
+    let forceDirY = sin(sinPhase);
+    let forceDir = normalize(vec2<f32>(forceDirX, forceDirY));
+    let forceStrength = _Uniforms._ForceByColorParams.x
                       * _Uniforms._RenderTargetTexelSize.zw * 0.25;
     (*state).velocity += forceDir * forceStrength * dt;
 }
@@ -856,6 +877,16 @@ fn SoftwareRasterizeDynamicParticles(@builtin(global_invocation_id) globalId: ve
     let sampledColorBySpeed = textureSampleLevel(_ParticleColorBySpeedGradientTexture, _sampler_bilinear_clamp, vec2<f32>(speedRemap, 0.5), 0.0);
     color = mix(color, sampledColorBySpeed, _Uniforms._ColorBySpeedParams.w);
 
+    let sortingPeakCount = _Uniforms._SoftwareRasterizeSortingParams.x;
+    let sortingChangeSpeed = _Uniforms._SoftwareRasterizeSortingParams.y;
+    let particleBlendMode = u32(_Uniforms._SoftwareRasterizeSortingParams.z);
+
+    // color.a as sorting index
+    var sortingIndex = particleState.color.a;
+    sortingIndex = cos(sortingPeakCount * 3.14 * sortingIndex + _Uniforms._Time * sortingChangeSpeed);
+    sortingIndex = saturate(sortingIndex * 0.5 + 0.5);
+
+    color.a = sortingIndex;
     let packedColor = PackColor(color);
     let particleRenderSize = i32(_Uniforms._DynamicParticleSize);
 
@@ -875,8 +906,18 @@ fn SoftwareRasterizeDynamicParticles(@builtin(global_invocation_id) globalId: ve
             // var uv = vec2<f32>(f32(x), f32(y)) / f32(particleRenderSize);
             // uv = uv * 2.0 - 1.0;
 
-
-            atomicStore(&_RasterTargetBuffer_RW[u32(texel1D)], packedColor);
+            if (particleBlendMode == 0) // Stable Sorting
+            {    
+                atomicMax(&_RasterTargetBuffer_RW[u32(texel1D)], packedColor);
+            }
+            else if (particleBlendMode == 1) // Random
+            {
+                atomicStore(&_RasterTargetBuffer_RW[u32(texel1D)], packedColor);
+            }
+            else if (particleBlendMode == 2) // Additive
+            {
+                atomicOr(&_RasterTargetBuffer_RW[u32(texel1D)], packedColor);
+            }
         }
     }
 }
