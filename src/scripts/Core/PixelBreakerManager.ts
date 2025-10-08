@@ -11,7 +11,7 @@ import pixelBreakerRenderFS from "../../Shaders/PixelBreaker.render.fs.wgsl";
 import { SharedTextureSamplerCollection } from "../GfxUtils/SharedTextureSampler";
 import { UIBinding, UIGradient } from '../GUI/UIProperty';
 import { GradientEx, GradientTexture } from '../GfxUtils/ColorGradient';
-import { GradientBladeParams } from 'tweakpane-plugin-gradient';
+import { GradientBladeParams, Gradient } from 'tweakpane-plugin-gradient';
 
 
 class RenderTargetSizeInfo
@@ -65,46 +65,6 @@ export class ParticleCountReadbackBuffer
 }
 
 
-
-const kParticleSpawnColorGradientParams = {
-    view: 'gradient',
-    initialPoints: [ // minimum 2 points
-      { time: 0, value: { r: 255, g: 0, b: 255, a: 1 } },
-      { time: 1, value: { r: 0, g: 255, b: 255, a: 1 } },
-    ],
-    label: 'Static Particle Color',
-    colorPicker: true,
-    colorPickerProps: {
-      alpha: true,
-      layout: 'popup',
-      expanded: false,
-    },
-    alphaPicker: false,
-    timePicker: false,
-    timeStep: 0.001,
-    timeDecimalPrecision: 4,
-  } satisfies GradientBladeParams;
-
-  const kParticleColorBySpeedGradientParams = {
-    view: 'gradient',
-    initialPoints: [ // minimum 2 points
-      { time: 0, value: { r: 255, g: 0, b: 255, a: 1 } },
-      { time: 1, value: { r: 0, g: 255, b: 255, a: 1 } },
-    ],
-    label: 'Dynamic Particle Color',
-    colorPicker: true,
-    colorPickerProps: {
-      alpha: true,
-      layout: 'popup',
-      expanded: false,
-    },
-    alphaPicker: false,
-    timePicker: false,
-    timeStep: 0.001,
-    timeDecimalPrecision: 4,
-  } satisfies GradientBladeParams;
-
-
 export class PixelBreakerParams
 {
 
@@ -143,17 +103,23 @@ export class PixelBreakerParams
     @UIBinding({category: "SDF Force", bindingParams: { label: "Swirl Strength" } })
     public distanceFieldSwirlStrength : number = 10;
 
+    @UIBinding({category: "Force By Color", bindingParams: { label: "Force Strength" } })
+    public forceByColorStrength : number = 5.0;
+
+    @UIBinding({category: "Force By Color", bindingParams: { label: "Change Speed", min: 0, max: 5, step: 0.01 } })
+    public forceByColorChangeSpeed: number = 1.5;
+
     @UIBinding({category: "Dynamic Particle Render", bindingParams: { label: "Render Size", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
     public dynamicParticleSize: number = 4.0;
 
     @UIBinding({category: "Dynamic Particle Render", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 0.5, step: 0.001 } })
     public trailFadeRate : number = 0.05;
 
-    @UIGradient({category: "Particle Color", gradientParams: kParticleSpawnColorGradientParams })
-    public particleSpawnColorGradient: GradientEx = GradientEx.Rainbow(16, 0.3, 0.35);
+    @UIGradient({category: "Particle Color", label: "Particle Spawn Color" })
+    public particleSpawnColorGradient: Gradient = GradientEx.HSV(64);
 
-    @UIGradient({category: "Particle Color", gradientParams: kParticleColorBySpeedGradientParams })
-    public particleColorBySpeedGradient: GradientEx = GradientEx.Rainbow(16, 0.3, 0.35);
+    @UIGradient({category: "Particle Color", label: "Particle Color By Speed" })
+    public particleColorBySpeedGradient: Gradient = GradientEx.HSV(64);
 
     @UIBinding({category: "Particle Color", bindingParams: { label: "Color By Speed Remap Range" } })
     public colorBySpeedRamapRange: BABYLON.Vector2 = new BABYLON.Vector2(0, 500);
@@ -166,6 +132,7 @@ export class PixelBreakerParams
     
     @UIBinding({category: "Particle Color", bindingParams: { label: "Sync Static Particle when hit", min: 0, max: 1, step: 0.01 } })
     public colorChangeWhenCollideWithStaticParticle : number = 0;
+
 
 
     public HandlePropertyChange(property: string, value: any, pixelBreakerManager: PixelBreakerManager)
@@ -234,6 +201,12 @@ export class PixelBreakerParams
                 break;
             case "colorBySpeedFactor":
                 this.colorBySpeedFactor = value;
+                break;
+            case "forceByColorStrength":
+                this.forceByColorStrength = value;
+                break;
+            case "forceByColorChangeSpeed":
+                this.forceByColorChangeSpeed = value;
                 break;
         }
     }
@@ -444,13 +417,13 @@ export class PixelBreakerManager
         if (!this.particleSpawnColorGradientTexture)
         {
             this.particleSpawnColorGradientTexture = new GradientTexture(256, this._scene!);
-            this.particleSpawnColorGradientTexture.Update(this.params.particleSpawnColorGradient);
+            this.particleSpawnColorGradientTexture.UpdateFromTPGradient(this.params.particleSpawnColorGradient);
         }
 
         if (!this.particleColorBySpeedGradientTexture)
         {
             this.particleColorBySpeedGradientTexture = new GradientTexture(256, this._scene!);
-            this.particleColorBySpeedGradientTexture.Update(this.params.particleColorBySpeedGradient);
+            this.particleColorBySpeedGradientTexture.UpdateFromTPGradient(this.params.particleColorBySpeedGradient);
         }
 
         return true;
@@ -587,6 +560,9 @@ export class PixelBreakerManager
         this._computeUBO.updateVector4("_DistanceFieldForceParams", distanceFieldForceParams);
 
         this._computeUBO.updateFloat("_TrailFadeRate", this.params.trailFadeRate);
+
+        const forceByColorParams = new BABYLON.Vector4(this.params.forceByColorStrength, this.params.forceByColorChangeSpeed, 0, 0);
+        this._computeUBO.updateVector4("_ForceByColorParams", forceByColorParams);
 
         this._computeUBO.update();
     }

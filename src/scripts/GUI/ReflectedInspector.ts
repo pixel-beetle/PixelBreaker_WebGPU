@@ -1,12 +1,12 @@
 import { UIBuilder, UIBuilderOptions } from './UIBuilder';
 import { GetUIProperties } from './UIProperty';
 
-export interface ReflectionUIManagerOptions extends UIBuilderOptions {
+export interface ReflectedInspectorOptions extends UIBuilderOptions {
     autoRefresh?: boolean;
     refreshInterval?: number;
 }
 
-export class ReflectionUIManager 
+export class ReflectedInspector 
 {
     private _uiBuilder: UIBuilder;
     public get uiBuilder(): UIBuilder 
@@ -15,9 +15,9 @@ export class ReflectionUIManager
     }
     private _targets: Map<string, any> = new Map();
     private _refreshTimer?: number;
-    private _options: ReflectionUIManagerOptions;
+    private _options: ReflectedInspectorOptions;
 
-    constructor(options: ReflectionUIManagerOptions = {}) 
+    constructor(options: ReflectedInspectorOptions = {}) 
     {
         this._options = {
             autoRefresh: false,

@@ -1,7 +1,7 @@
 import * as BABYLON from 'babylonjs';
 import { SceneManager } from './scripts/Core/SceneManager';
 import { VideoManager } from './scripts/Core/VideoManager';
-import { ReflectionUIManager } from './scripts/GUI/ReflectionUIManager';
+import { ReflectedInspector } from './scripts/GUI/ReflectedInspector';
 import JumpFloodingSDFGenerator from './scripts/Core/JumpFloodingSDFGenerator';
 import { PixelBreakerManager } from './scripts/Core/PixelBreakerManager';
 import { UIBinding } from './scripts/GUI/UIProperty';
@@ -40,7 +40,7 @@ export class Application
     private engine: BABYLON.Engine;
     private sceneManager!: SceneManager;
     private videoManager!: VideoManager;
-    private reflectionUIManager!: ReflectionUIManager;
+    private reflectionUIManager!: ReflectedInspector;
     private jumpFloodingSDFGenerator!: JumpFloodingSDFGenerator;
     private pixelBreakerManager!: PixelBreakerManager;
 
@@ -55,7 +55,7 @@ export class Application
 
     private InitializeManagers(): void 
     {
-        this.reflectionUIManager = new ReflectionUIManager({
+        this.reflectionUIManager = new ReflectedInspector({
             title: 'Control Panel',
             position: 'center',
             expanded: true,

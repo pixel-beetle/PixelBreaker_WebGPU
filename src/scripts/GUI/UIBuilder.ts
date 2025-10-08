@@ -1,7 +1,7 @@
 import { BindingParams, FolderApi, Pane } from 'tweakpane';
 import { UIPropertyMetadata, GetUIProperties, ButtonOptions, BindingOptions, GradientOptions } from './UIProperty';
 import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
-import { GradientBladeApi, GradientPluginBundle } from 'tweakpane-plugin-gradient';
+import { Gradient, GradientBladeApi, GradientBladeParams, GradientPluginBundle } from 'tweakpane-plugin-gradient';
 
 
 export interface UIBuilderOptions {
@@ -102,8 +102,33 @@ export class UIBuilder
                     });
                     break;
                 case 'gradient':
+                    let kGradientParams: GradientBladeParams = {
+                        view: 'gradient',
+                        initialPoints: [ // minimum 2 points
+                          { time: 0, value: { r: 255, g: 0, b: 255, a: 1 } },
+                          { time: 1, value: { r: 0, g: 255, b: 255, a: 1 } },
+                        ],
+                        label: 'Gradient',
+                        colorPicker: true,
+                        colorPickerProps: {
+                          alpha: true,
+                          layout: 'popup',
+                          expanded: false,
+                        },
+                        alphaPicker: false,
+                        timePicker: false,
+                        timeStep: 0.001,
+                        timeDecimalPrecision: 4,
+                      };
+
                     const gradientOptions = options as GradientOptions;
-                    const gradientParams = gradientOptions.gradientParams!;
+                    const gradientParams = kGradientParams;
+                    gradientParams.label = gradientOptions.label || 'Gradient';
+                    
+                    if (target[propertyKey] && target[propertyKey] instanceof Gradient)
+                    {
+                        gradientParams.initialPoints = target[propertyKey].points;
+                    }
                     const gradient = folder.addBlade(gradientParams) as GradientBladeApi;
                     gradient.on('change', (ev: any) => {
                         if (onPropertyChange) {

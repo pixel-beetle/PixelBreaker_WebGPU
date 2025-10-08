@@ -20,7 +20,7 @@ export interface ButtonOptions extends UIPropertyOptions
 
 export interface GradientOptions extends UIPropertyOptions 
 {
-    gradientParams?: GradientBladeParams;
+    label?: string;
 }
 
 

@@ -88,6 +88,7 @@ struct Uniforms
     _ReflectionBoardColor: vec4<f32>,
     
     _DistanceFieldForceParams: vec4<f32>,
+    _ForceByColorParams: vec4<f32>,
 
     _ColorByCollisionParams: vec4<f32>,
     _ColorBySpeedParams: vec4<f32>, // xy:remap range, w:enable
@@ -551,9 +552,8 @@ fn IsParticleCollidingStaticParticle(position: vec2<f32>, velocity: vec2<f32>,
 }
 
 
-fn ClampParticleSpeed(velocity: ptr<function, vec2<f32>>)
+fn ClampParticleSpeed(velocity: ptr<function, vec2<f32>>, maxSpeed: f32)
 {
-    let maxSpeed = _Uniforms._DynamicParticleSpeedParams.y;
     let useFixedSpeed = _Uniforms._DynamicParticleSpeedParams.z > 0.5;
     let fixedSpeed = _Uniforms._DynamicParticleSpeedParams.w;
     let speed = length(*velocity);
@@ -593,7 +593,7 @@ fn rotate_90_cw(v: vec2<f32>) -> vec2<f32> {
     return vec2<f32>(v.y, -v.x);
 }
 
-fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f32)
+fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f32, maxSpeed: ptr<function, f32>)
 {
     let useDistanceField = _Uniforms._DistanceFieldForceParams.x > 0.5;
     if(!useDistanceField)
@@ -617,6 +617,8 @@ fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f
         let collisionStrength = _Uniforms._DistanceFieldForceParams.y
                     * _Uniforms._RenderTargetTexelSize.zw * 0.25;
         (*state).velocity += dfGradient * collisionStrength * dt;
+
+        *maxSpeed = min(*maxSpeed * mix(1.5, 3.5, pow(df, 0.3)), 8000.0);
     }
     else
     {
@@ -644,7 +646,9 @@ fn ApplyParticleMotion_ForceByColor(state : ptr<function, ParticleState>, dt: f3
 {
     let color = state.color;
     let forceDir = normalize(vec2<f32>(color.r, color.b) * 2.0 - 1.0);
-    let forceStrength = 5.0 * _Uniforms._RenderTargetTexelSize.zw * 0.25;
+    let forceStrength = _Uniforms._ForceByColorParams.x 
+                      * sin(_Uniforms._Time * _Uniforms._ForceByColorParams.y)
+                      * _Uniforms._RenderTargetTexelSize.zw * 0.25;
     (*state).velocity += forceDir * forceStrength * dt;
 }
 
@@ -661,10 +665,11 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     let particleActivateState = ReadPrevParticleActivateState(particleSlotID);
     let deltaTime = min(0.05, _Uniforms._DeltaTime);
 
-    ApplyParticleMotion_DistanceField(&particleState, deltaTime);
+    var maxSpeed = _Uniforms._DynamicParticleSpeedParams.y;
+    ApplyParticleMotion_DistanceField(&particleState, deltaTime, &maxSpeed);
     ApplyParticleMotion_ForceByColor(&particleState, deltaTime);
     var newVelocity = particleState.velocity;
-    ClampParticleSpeed(&newVelocity);
+    ClampParticleSpeed(&newVelocity, maxSpeed);
 
     var newPosition = particleState.position + newVelocity * deltaTime;
     var newColor = particleState.color;
