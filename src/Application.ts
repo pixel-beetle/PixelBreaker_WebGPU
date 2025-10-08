@@ -52,33 +52,36 @@ class KeyControlInfo
 export class Application 
 {
     @UIBinding({ category: "Application", bindingParams: { label: "Render Target Resolution", options: kRenderTargetResolutionOptionsList } })
-    private renderTargetResolutionOption: string = '1080p';
+    private _renderTargetResolutionOption: string = '1080p';
 
-    private renderTargetWidth: number = kRenderTargetResolutionOptions[this.renderTargetResolutionOption][0];
-    private renderTargetHeight: number = kRenderTargetResolutionOptions[this.renderTargetResolutionOption][1];
+    private _renderTargetWidth: number = kRenderTargetResolutionOptions[this._renderTargetResolutionOption][0];
+    private _renderTargetHeight: number = kRenderTargetResolutionOptions[this._renderTargetResolutionOption][1];
     
-    private engine: BABYLON.Engine;
-    private sceneManager!: SceneManager;
-    private videoManager!: VideoManager;
-    private inspector!: ReflectedInspector;
-    private jumpFloodingSDFGenerator!: JumpFloodingSDFGenerator;
-    private pixelBreakerManager!: PixelBreakerManager;
+    private _engine: BABYLON.Engine;
+    private _sceneManager!: SceneManager;
+    private _videoManager!: VideoManager;
+    private _inspector!: ReflectedInspector;
+    private _jumpFloodingSDFGenerator!: JumpFloodingSDFGenerator;
+    private _pixelBreakerManager!: PixelBreakerManager;
 
+    private _isFirstInteractionGot: boolean = false;
     private _isPaused: boolean = true;
-    private fpsGraph: any = null;
-    private playStateText : any = null;
-    private keyControlInfo: KeyControlInfo = new KeyControlInfo();
+    private _fpsGraph: any = null;
+    private _playStateText : any = null;
+    private _keyControlInfo: KeyControlInfo = new KeyControlInfo();
+
+    private _posterElement: HTMLElement | null = null;
 
     constructor(readonly canvas: HTMLCanvasElement) {
-        this.engine = new BABYLON.WebGPUEngine(canvas) as any;
+        this._engine = new BABYLON.WebGPUEngine(canvas) as any;
         window.addEventListener('resize', () => {
-            this.engine.resize();
+            this._engine.resize();
         });
     }
 
     private InitializeManagers(): void 
     {
-        this.inspector = new ReflectedInspector({
+        this._inspector = new ReflectedInspector({
             title: 'Control Panel',
             position: 'center',
             expanded: true,
@@ -87,74 +90,64 @@ export class Application
         });
 
 
-        this.sceneManager = new SceneManager(this.engine, this.canvas, this.renderTargetWidth / this.renderTargetHeight);
-        this.videoManager = new VideoManager(this.sceneManager.scene);
-        this.jumpFloodingSDFGenerator = new JumpFloodingSDFGenerator();
-        this.pixelBreakerManager = new PixelBreakerManager();
+        this._sceneManager = new SceneManager(this._engine, this.canvas, this._renderTargetWidth / this._renderTargetHeight);
+        this._videoManager = new VideoManager(this._sceneManager.scene);
+        this._jumpFloodingSDFGenerator = new JumpFloodingSDFGenerator();
+        this._pixelBreakerManager = new PixelBreakerManager();
 
         this.RegisterUITargets();
 
-        this.videoManager.SetupVideo('./BadApple_Video.mp4');
-        const videoParentNode = this.inspector.tree?.GetTabPage(kTabPagePath_General)!;
-        videoParentNode.element.appendChild(this.videoManager.videoElement!);
+        this._videoManager.SetupVideo('./BadApple_Video.mp4');
+        const videoParentNode = this._inspector.tree?.GetTabPage(kTabPagePath_General)!;
+        videoParentNode.element.appendChild(this._videoManager.videoElement!);
     }
 
     private RegisterUITargets(): void
     {
-        this.inspector.BeginContainerPathScope(kTabPagePath_General);
-        this.inspector.RegisterTarget(this.keyControlInfo, (property: string, value: any) => {
+        this._inspector.BeginContainerPathScope(kTabPagePath_General);
+        this._inspector.RegisterTarget(this._keyControlInfo, (property: string, value: any) => {
 
         });
-        this.inspector.RegisterTarget(this, (property: string, value: any) => {
+        this._inspector.RegisterTarget(this, (property: string, value: any) => {
             switch (property) {
                 case 'renderTargetResolutionOption':
-                    this.renderTargetWidth = kRenderTargetResolutionOptions[value][0];
-                    this.renderTargetHeight = kRenderTargetResolutionOptions[value][1];
+                    this._renderTargetWidth = kRenderTargetResolutionOptions[value][0];
+                    this._renderTargetHeight = kRenderTargetResolutionOptions[value][1];
                     break;
             }
         });
-        this.inspector.RegisterTarget(this.videoManager, (property: string, value: any) => {
-            switch (property) {
-                case 'playPause':
-                    this.ToggleVideoPlayPause();
-                    break;
-                case 'volume':
-                    this.videoManager.SetAudioVolume(value);
-                    break;
-            }
-        });
-        this.inspector.RegisterTarget(this.jumpFloodingSDFGenerator.params, (property: string, value: any) => {
+        this._inspector.RegisterTarget(this._jumpFloodingSDFGenerator.params, (property: string, value: any) => {
             switch (property) {
                 case 'inputValueThreshold':
-                    this.jumpFloodingSDFGenerator.params.inputValueThreshold = value;
+                    this._jumpFloodingSDFGenerator.params.inputValueThreshold = value;
                     break;
                 case 'inputInvert':
-                    this.jumpFloodingSDFGenerator.params.inputInvert = value;
+                    this._jumpFloodingSDFGenerator.params.inputInvert = value;
             }
         });
-        this.inspector.EndContainerPathScope();
+        this._inspector.EndContainerPathScope();
 
-        this.inspector.BeginContainerPathScope(kTabPagePath_Particles);
-        this.inspector.RegisterTarget(this.pixelBreakerManager.params, (property: string, value: any) => {
-            this.pixelBreakerManager.params.HandlePropertyChange(property, value, this.pixelBreakerManager);
+        this._inspector.BeginContainerPathScope(kTabPagePath_Particles);
+        this._inspector.RegisterTarget(this._pixelBreakerManager.params, (property: string, value: any) => {
+            this._pixelBreakerManager.params.HandlePropertyChange(property, value, this._pixelBreakerManager);
         });
-        this.inspector.EndContainerPathScope();
+        this._inspector.EndContainerPathScope();
 
-        this.inspector.BeginContainerPathScope(kTabPagePath_Board);
-        this.inspector.RegisterTarget(this.pixelBreakerManager.boardParams, (property: string, value: any) => {
-            this.pixelBreakerManager.boardParams.HandlePropertyChange(property, value, this.pixelBreakerManager);
+        this._inspector.BeginContainerPathScope(kTabPagePath_Board);
+        this._inspector.RegisterTarget(this._pixelBreakerManager.boardParams, (property: string, value: any) => {
+            this._pixelBreakerManager.boardParams.HandlePropertyChange(property, value, this._pixelBreakerManager);
         });
-        this.inspector.EndContainerPathScope();
+        this._inspector.EndContainerPathScope();
 
-        this.inspector.BeginContainerPathScope(kFolderPath_Debug);
-        this.inspector.RegisterTarget(this.pixelBreakerManager.particleCountReadback, (property: string, value: any) => {
+        this._inspector.BeginContainerPathScope(kFolderPath_Debug);
+        this._inspector.RegisterTarget(this._pixelBreakerManager.particleCountReadback, (property: string, value: any) => {
             
         });
-        this.inspector.EndContainerPathScope();
+        this._inspector.EndContainerPathScope();
 
-        this.inspector.BuildUIComponents();
+        this._inspector.BuildUIComponents();
 
-        const applicationFolder = this.inspector.tree!.GetFolder(kFolderPath_Application)!;
+        const applicationFolder = this._inspector.tree!.GetFolder(kFolderPath_Application)!;
         const playPauseButtonGrid : any = applicationFolder.addBlade({
             view: 'buttongrid',
             size: [2, 1],
@@ -175,13 +168,13 @@ export class Application
                 }
           });
 
-        this.playStateText = applicationFolder.addBlade({
+        this._playStateText = applicationFolder.addBlade({
             view: 'text',
             parse: (v: any) => String(v),
             value: 'Play State',
           });
 
-        this.fpsGraph = (this.inspector.tree!.GetFolder(kFolderPath_Debug))!.addBlade({
+        this._fpsGraph = (this._inspector.tree!.GetFolder(kFolderPath_Debug))!.addBlade({
             view: 'fpsgraph',
             label: 'FPS',
         });
@@ -190,61 +183,64 @@ export class Application
     private ToggleApplicationPause(): void
     {
         this._isPaused = !this._isPaused;
-        if (this._isPaused === this.videoManager.IsPaused())
+        if (this._isPaused === this._videoManager.IsPaused())
             return;
-        this.videoManager.TogglePlayPause();
+        this._videoManager.TogglePlayPause();
     }
 
     private ToggleVideoPlayPause(): void
     {
         if (this._isPaused)
             return;
-        this.videoManager.TogglePlayPause();
+        this._videoManager.TogglePlayPause();
     }
 
     private Restart(): void
     {
         this._isPaused = false;
-        this.videoManager.Restart();
-        this.pixelBreakerManager.Reset();
+        this._videoManager.Restart();
+        this._pixelBreakerManager.Reset();
     }
 
     private SetUpBabylonDebugLayer(debugOn: boolean = true): void 
     {
         if (debugOn) {
-            this.sceneManager.scene.debugLayer.show({ overlay: true });
+            this._sceneManager.scene.debugLayer.show({ overlay: true });
         } else {
-            this.sceneManager.scene.debugLayer.hide();
+            this._sceneManager.scene.debugLayer.hide();
         }
     }
 
     private SetUpInputActions(): void
     {
-        this.sceneManager.scene.actionManager = new BABYLON.ActionManager(this.sceneManager.scene);
+        this._sceneManager.scene.actionManager = new BABYLON.ActionManager(this._sceneManager.scene);
         // keyword P to toggle inspector
-        this.sceneManager.scene.actionManager.registerAction(
+        this._sceneManager.scene.actionManager.registerAction(
             new BABYLON.ExecuteCodeAction(
                 {
                   trigger: BABYLON.ActionManager.OnKeyDownTrigger,
                   parameter: "p",
                 },
-                () => { this.inspector.Toggle(); }
+                () => { this._inspector.Toggle(); }
               )
         );
 
         // keyboard space to toggle application pause
-        this.sceneManager.scene.actionManager.registerAction(
+        this._sceneManager.scene.actionManager.registerAction(
             new BABYLON.ExecuteCodeAction(
                 {
                   trigger: BABYLON.ActionManager.OnKeyDownTrigger,
                   parameter: " ",
                 },
-                () => { this.ToggleApplicationPause(); }
+                () => { 
+                    this.ToggleApplicationPause(); 
+                    this._isFirstInteractionGot = true;
+                }
               )
         );
 
         // keyboard v to toggle video play pause
-        this.sceneManager.scene.actionManager.registerAction(
+        this._sceneManager.scene.actionManager.registerAction(
             new BABYLON.ExecuteCodeAction(
                 {
                   trigger: BABYLON.ActionManager.OnKeyDownTrigger,
@@ -255,7 +251,7 @@ export class Application
         );
 
         // keyboard r to restart application
-        this.sceneManager.scene.actionManager.registerAction(
+        this._sceneManager.scene.actionManager.registerAction(
             new BABYLON.ExecuteCodeAction(
                 {
                   trigger: BABYLON.ActionManager.OnKeyDownTrigger,
@@ -266,32 +262,74 @@ export class Application
         );
 
         // keyboard a to move reflection board left
-        this.sceneManager.scene.actionManager.registerAction(
+        this._sceneManager.scene.actionManager.registerAction(
             new BABYLON.ExecuteCodeAction(
                 {
                   trigger: BABYLON.ActionManager.OnKeyDownTrigger,
                   parameter: "a",
                 },
-                () => { this.pixelBreakerManager.boardParams.OnGetInput(-1); }
+                () => { this._pixelBreakerManager.boardParams.OnGetInput(-1); }
               )
         );
 
         // keyboard d to move reflection board right
-        this.sceneManager.scene.actionManager.registerAction(
+        this._sceneManager.scene.actionManager.registerAction(
             new BABYLON.ExecuteCodeAction(
                 {
                   trigger: BABYLON.ActionManager.OnKeyDownTrigger,
                   parameter: "d",
                 },
-                () => { this.pixelBreakerManager.boardParams.OnGetInput(1); }
+                () => { this._pixelBreakerManager.boardParams.OnGetInput(1); }
               )
         );
     }
 
+    private CreatePosterElement(): HTMLElement
+    {
+        const posterElement = document.createElement('div');
+        posterElement.style.position = 'absolute';
+        posterElement.style.top = '0';
+        posterElement.style.left = '0';
+        posterElement.style.width = '100%';
+        posterElement.style.height = '100%';
+        posterElement.style.backgroundColor = 'black';
+        posterElement.style.display = 'flex';
+        posterElement.style.justifyContent = 'center';
+        posterElement.style.alignItems = 'center';
+        posterElement.style.color = 'white';
+        posterElement.style.fontSize = '96px';
+        posterElement.style.fontWeight = 'bold';
+        posterElement.style.zIndex = '1000';
+        return posterElement;
+    }
+
     async Run(): Promise<void> 
     {
-        if ((this.engine as any).initAsync) {
-            await (this.engine as any).initAsync();
+        const webGPUSupport = await BABYLON.WebGPUEngine.IsSupportedAsync;
+        if (!webGPUSupport)
+        {
+            this._posterElement = this.CreatePosterElement();
+            this._posterElement.innerHTML = "WebGPU not supported";
+            document.body.appendChild(this._posterElement);
+            console.error("WebGPU is not supported, please use a browser that supports WebGPU, try Chrome or Edge.");
+            return;
+        }
+        else
+        {
+            // ask for first interaction
+            this._posterElement = this.CreatePosterElement();
+            this._posterElement.innerHTML = "Click to start";
+            document.body.appendChild(this._posterElement);
+            this._posterElement.addEventListener('click', () => {
+                this._posterElement!.remove();
+                this._posterElement = null;
+                this._isFirstInteractionGot = true;
+                this.ToggleApplicationPause();
+            });
+        }
+
+        if ((this._engine as any).initAsync) {
+            await (this._engine as any).initAsync();
         }
         this.InitializeManagers();
         
@@ -299,38 +337,55 @@ export class Application
 
         this.SetUpInputActions();
         
-        this.engine.runRenderLoop(() => {
-            this.fpsGraph!.begin();
-            this.videoManager!.videoTexture!.update();
+        this._engine.runRenderLoop(() => {
+            if (this._isPaused)
+            {
+                this._videoManager.videoElement!.pause();
+            }
+
+            if (!this._isFirstInteractionGot)
+            {
+                return;
+            }
+
+            this._fpsGraph!.begin();
+            this._videoManager!.videoTexture!.update();
 
             if (!this._isPaused)
             {
-                this.jumpFloodingSDFGenerator.Tick(
-                    this.sceneManager.scene, 
-                    this.engine, 
-                    this.videoManager!.videoTexture!);
+                this._jumpFloodingSDFGenerator.Tick(
+                    this._sceneManager.scene, 
+                    this._engine, 
+                    this._videoManager!.videoTexture!);
                 
-                this.pixelBreakerManager.Tick(
-                        this.sceneManager.scene, 
-                        this.engine, 
-                        {width: this.renderTargetWidth, height: this.renderTargetHeight},
-                        this.jumpFloodingSDFGenerator.resultTexture!);
+                this._pixelBreakerManager.Tick(
+                        this._sceneManager.scene, 
+                        this._engine, 
+                        {width: this._renderTargetWidth, height: this._renderTargetHeight},
+                        this._jumpFloodingSDFGenerator.resultTexture!);
             }
 
-            this.sceneManager.render(this.pixelBreakerManager.renderMaterial!);
-            this.fpsGraph!.end();
+            this._sceneManager.render(this._pixelBreakerManager.renderMaterial!);
+            this._fpsGraph!.end();
 
-            this.playStateText.value = this._isPaused ? 'Application is Paused' : 'Application is Playing';
+            this._playStateText.value = this._isPaused ? 'Application is Paused' : 'Application is Playing';
         });
     }
 
     dispose(): void 
     {
-        this.inspector.dispose();
-        this.videoManager.dispose();
-        this.sceneManager.dispose();
-        this.engine.dispose();
-        this.jumpFloodingSDFGenerator.Release();
+        this._inspector.dispose();
+        this._videoManager.dispose();
+        this._sceneManager.dispose();
+        this._engine.dispose();
+        this._jumpFloodingSDFGenerator.Release();
+        this._pixelBreakerManager.Release();
+
+        if (this._posterElement)
+        {
+            this._posterElement.remove();
+            this._posterElement = null;
+        }
     }
 
 }
