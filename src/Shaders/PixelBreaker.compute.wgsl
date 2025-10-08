@@ -625,18 +625,22 @@ fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f
 
     var dfGradient = dfTexSample.xy * 2.0 - 1.0;
     dfGradient = SafeNormalize(dfGradient);
-
+    let dfTangent = rotate_90_ccw(dfGradient);
+    
     let sdf = dfTexSample.z * 2.0 - 1.0;
     let isInsideDf = sdf < 0.0;
     let df = abs(sdf);
-
     
     if (isInsideDf)
     {
         let collisionStrength = _Uniforms._DistanceFieldForceParams.y
                     * _Uniforms._RenderTargetTexelSize.zw * 0.25;
         (*state).velocity += dfGradient * collisionStrength * dt;
-
+        
+        let swirlStrength = _Uniforms._DistanceFieldForceParams.w
+                            * _Uniforms._RenderTargetTexelSize.zw * 0.25;
+        (*state).velocity += dfTangent * swirlStrength * dt;
+        
         *maxSpeed = min(*maxSpeed * mix(1.5, 3.5, pow(df, 0.3)), 8000.0);
     }
     else
@@ -647,7 +651,6 @@ fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f
         }
         else
         {
-            let dfTangent = rotate_90_ccw(dfGradient);
             let swirlStrength = _Uniforms._DistanceFieldForceParams.z
                     * _Uniforms._RenderTargetTexelSize.zw * 0.25;
             (*state).velocity += dfTangent * swirlStrength * dt;
@@ -663,11 +666,13 @@ fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f
 
 fn ApplyParticleMotion_ForceByColor(state : ptr<function, ParticleState>, dt: f32)
 {
-    let particleStableRandom = state.color.a;
-    let sinPhase = particleStableRandom + _Uniforms._Time * _Uniforms._ForceByColorParams.y;
-    let forceDirX = cos(sinPhase);
-    let forceDirY = sin(sinPhase);
-    let forceDir = normalize(vec2<f32>(forceDirX, forceDirY));
+    let phaseOffset = state.color.g + _Uniforms._ForceByColorParams.y;
+    var forceDir = normalize(vec2<f32>(state.color.r, 
+                                        state.color.b) * 2.0 - 1.0);
+    let rotation = mat2x2<f32>(vec2<f32>(cos(phaseOffset), -sin(phaseOffset)),
+                               vec2<f32>(sin(phaseOffset), cos(phaseOffset)));
+    forceDir = rotation * forceDir;
+    forceDir = normalize(forceDir);
     let forceStrength = _Uniforms._ForceByColorParams.x
                       * _Uniforms._RenderTargetTexelSize.zw * 0.25;
     (*state).velocity += forceDir * forceStrength * dt;

@@ -44,9 +44,9 @@ class KeyControlInfo
     @UIBinding({ category: "Key Control", bindingParams: { label: "Toggle Inspector", readonly: true } })
     public inspectorToggleKey: string = 'P';
     @UIBinding({ category: "Key Control", bindingParams: { label: "Reflection Board Move Left", readonly: true } })
-    public reflectionBoardMoveLeft: string = 'A or <-';
+    public reflectionBoardMoveLeft: string = 'A';
     @UIBinding({ category: "Key Control", bindingParams: { label: "Reflection Board Move Right", readonly: true } })
-    public reflectionBoardMoveRight: string = 'D or ->';
+    public reflectionBoardMoveRight: string = 'D';
 }
 
 export class Application 
@@ -258,6 +258,28 @@ export class Application
                   parameter: "r",
                 },
                 () => { this.Restart(); }
+              )
+        );
+
+        // keyboard a to move reflection board left
+        this.sceneManager.scene.actionManager.registerAction(
+            new BABYLON.ExecuteCodeAction(
+                {
+                  trigger: BABYLON.ActionManager.OnKeyDownTrigger,
+                  parameter: "a",
+                },
+                () => { this.pixelBreakerManager.boardParams.OnGetInput(-1); }
+              )
+        );
+
+        // keyboard d to move reflection board right
+        this.sceneManager.scene.actionManager.registerAction(
+            new BABYLON.ExecuteCodeAction(
+                {
+                  trigger: BABYLON.ActionManager.OnKeyDownTrigger,
+                  parameter: "d",
+                },
+                () => { this.pixelBreakerManager.boardParams.OnGetInput(1); }
               )
         );
     }

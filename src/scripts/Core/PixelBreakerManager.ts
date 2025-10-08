@@ -62,19 +62,28 @@ export class ParticleCountReadbackBuffer
 
 export class PixelBreakerBoardParams
 {
+    @UIBinding({bindingParams: { label: "Move Speed", min: 0, max: 0.2, step: 0.001 } })
+    public reflectionBoardMoveSpeed: number = 0.05;
     @UIBinding({bindingParams: { label: "Y Position", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
     public reflectionBoardPosY01: number = 0.1;
     @UIBinding({bindingParams: { label: "Size", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
-    public reflectionBoardSize01 : BABYLON.Vector2 = new BABYLON.Vector2(0.2, 0.02);
+    public reflectionBoardSize01 : BABYLON.Vector2 = new BABYLON.Vector2(0.2, 0.0);
     @UIBinding({bindingParams: { label: "Color", color : { type: 'float' } } } )
     public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.95, 0.27, 0.74, 1.0);
 
     private _reflectionBoardPosX01 : number = 0.5;
 
-    public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.12);
-    public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.14);
+    public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.1);
+    public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.1);
 
-    private UpdateReflectionBoardRect()
+    public OnGetInput(direction: number = 0)
+    {
+        this._reflectionBoardPosX01 += direction * this.reflectionBoardMoveSpeed;
+        this._reflectionBoardPosX01 = Math.max(0, Math.min(1, this._reflectionBoardPosX01));
+        this.UpdateReflectionBoardRect();
+    }
+
+    public UpdateReflectionBoardRect()
     {
         let centerY = this.reflectionBoardPosY01;
         let size = this.reflectionBoardSize01;
@@ -129,7 +138,7 @@ export class PixelBreakerParticlesParams
     public particleColorTint: BABYLON.Color4 = new BABYLON.Color4(1.0, 1.0, 1.0, 1.0);
 
     @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Max Speed", min:0 } })
-    public dynamicParticleMaxSpeed: number = 800;
+    public dynamicParticleMaxSpeed: number = 1200;
 
     @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Use Fixed Speed", min:0 } })
     public dynamicParticleUseFixedSpeed : boolean = false;
@@ -141,15 +150,17 @@ export class PixelBreakerParticlesParams
     @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Enable", type: 'boolean' } })
     public useDistanceFieldForce : boolean = true;
     @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Collision Strength" } })
-    public distanceFieldCollisionStrength : number = 500;
-    @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Swirl Strength" } })
+    public distanceFieldCollisionStrength : number = 150;
+    @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Swirl Strength(Outside)" } })
     public distanceFieldSwirlStrength : number = 15;
+    @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Swirl Strength(Inside)" } })
+    public distanceFieldInsideSwirlStrength : number = 8;
 
-    @UIBinding({containerPath: "#T/%Update/@Force By Color", bindingParams: { label: "Force Strength" } })
-    public forceByColorStrength : number = 5.0;
+    @UIBinding({containerPath: "#T/%Update/@Force By Color", bindingParams: { label: "Strength" } })
+    public forceByColorStrength : number = 8.0;
 
-    @UIBinding({containerPath: "#T/%Update/@Force By Color", bindingParams: { label: "Change Speed over Time", min: 0, max: 5, step: 0.01 } })
-    public forceByColorChangeSpeed: number = 1.5;
+    @UIBinding({containerPath: "#T/%Update/@Force By Color", bindingParams: { label: "Dir Rotation Offset", min: 0, max: 6.28, step: 0.01 } })
+    public forceByColorDirRotationOffset: number = 1.5;
 
     @UIBinding({containerPath: "#T/%Update/@Color Change when Collide With", bindingParams: { label: "Reflection Board", min: 0, max: 1, step: 0.01 } })
     public colorChangeWhenCollideWithReflectionBoard : number = 0;
@@ -158,7 +169,7 @@ export class PixelBreakerParticlesParams
     public colorChangeWhenCollideWithStaticParticle : number = 0;
 
     @UIBinding({containerPath: "#T/%Render/@Size", bindingParams: { label: "Render Size", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
-    public dynamicParticleSize: number = 3;
+    public dynamicParticleSize: number = 1;
 
     @UIBinding({containerPath: "#T/%Render/@Trail", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 0.8, step: 0.001 } })
     public trailFadeRate : number = 0.2;
@@ -175,10 +186,10 @@ export class PixelBreakerParticlesParams
     public sortingShiftSpeed: number = 0.0003;
 
     @UIGradient({containerPath: "#T/%Render/@Speed Visualize", label: "Color Gradient" })
-    public particleColorBySpeedGradient: Gradient = GradientUtils.HSV(24);
+    public particleColorBySpeedGradient: Gradient = GradientUtils.Viridis();
 
     @UIBinding({containerPath: "#T/%Render/@Speed Visualize", bindingParams: { label: "Remap Range" } })
-    public colorBySpeedRamapRange: BABYLON.Vector2 = new BABYLON.Vector2(0, 500);
+    public colorBySpeedRamapRange: BABYLON.Vector2 = new BABYLON.Vector2(0, 2500);
 
     @UIBinding({containerPath: "#T/%Render/@Speed Visualize", bindingParams: { label: "Factor", min: 0, max: 1, step: 0.01 } })
     public colorBySpeedFactor: number = 0.0;
@@ -206,11 +217,14 @@ export class PixelBreakerParticlesParams
             case "useDistanceFieldForce":
                 this.useDistanceFieldForce = value;
                 break;
-            case "distanceFieldForceStrength":
+            case "distanceFieldCollisionStrength":
                 this.distanceFieldCollisionStrength = value;
                 break;
             case "distanceFieldSwirlStrength":
                 this.distanceFieldSwirlStrength = value;
+                break;
+            case "distanceFieldInsideSwirlStrength":
+                this.distanceFieldInsideSwirlStrength = value;
                 break;
             case "dynamicParticleInitialSpeed":
                 this.dynamicParticleInitialSpeed = value;
@@ -249,7 +263,7 @@ export class PixelBreakerParticlesParams
                 this.forceByColorStrength = value;
                 break;
             case "forceByColorChangeSpeed":
-                this.forceByColorChangeSpeed = value;
+                this.forceByColorDirRotationOffset = value;
                 break;
             case "particleBlendMode":
                 this.particleBlendMode = value;
@@ -316,6 +330,7 @@ export class PixelBreakerManager
     {
         this._scene = scene;
         this._engine = engine;
+        this.boardParams.UpdateReflectionBoardRect();
 
         const renderTargetSizeChanged = this._renderTargetSizeInfo.IsDifferent(renderTargetSize);
         this._renderTargetSizeInfo.Update(renderTargetSize);
@@ -609,12 +624,12 @@ export class PixelBreakerManager
         const distanceFieldForceParams = new BABYLON.Vector4(this.params.useDistanceFieldForce ? 1 : 0, 
             this.params.distanceFieldCollisionStrength, 
             this.params.distanceFieldSwirlStrength, 
-            0);
+            this.params.distanceFieldInsideSwirlStrength);
         this._computeUBO.updateVector4("_DistanceFieldForceParams", distanceFieldForceParams);
 
         this._computeUBO.updateFloat("_TrailFadeRate", this.params.trailFadeRate);
 
-        const forceByColorParams = new BABYLON.Vector4(this.params.forceByColorStrength, this.params.forceByColorChangeSpeed, 0, 0);
+        const forceByColorParams = new BABYLON.Vector4(this.params.forceByColorStrength, this.params.forceByColorDirRotationOffset, 0, 0);
         this._computeUBO.updateVector4("_ForceByColorParams", forceByColorParams);
 
         const softwareRasterizeSortingParams = new BABYLON.Vector4(

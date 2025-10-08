@@ -18,6 +18,22 @@ export class GradientUtils
         return gradient;
     }
 
+    public static Viridis() : Gradient
+    {
+        const gradient = new Gradient({
+            points: [
+                { time: 0, value: { r: 68, g: 1, b: 84, a: 1 } },
+                { time: 0.2, value: { r: 69, g: 50, b: 125, a: 1 } },
+                { time: 0.33, value: { r: 51, g: 131, b: 163, a: 1 } },
+                { time: 0.5, value: { r: 33, g: 144, b: 141, a: 1 } },
+                { time: 0.6, value: { r: 36, g: 159, b: 135, a: 1 } },
+                { time: 0.85, value: { r: 184, g: 222, b: 48, a: 1 } },
+                { time: 1, value: { r: 253, g: 231, b: 36, a: 1 } },
+            ],
+        });
+        return gradient;
+    }
+
     public static HSV( pointCount: number, 
                        startHue01: number = 0, 
                        endHue01: number = 1,
