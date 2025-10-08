@@ -6,36 +6,33 @@ import JumpFloodingSDFGenerator from './scripts/Core/JumpFloodingSDFGenerator';
 import { PixelBreakerManager } from './scripts/Core/PixelBreakerManager';
 import { UIBinding } from './scripts/GUI/UIProperty';
 
-
-const kRenderTargetWidthOptions = 
+const kRenderTargetResolutionOptionsList = 
 {
-    '480': 480,
-    '720': 720,
-    '1080': 1080,
-    '1440': 1440,
-    '1920': 1920,
-    '2160': 2160,
-    '2880': 2880,
-    '3840': 3840,
-}
+    '360p' : '360p',
+    '480p' : '480p',
+    '720p' : '720p',
+    '1080p' : '1080p',
+    '2K' : '2K',
+    '4K' : '4K'
+};
 
-const kRenderTargetHeightOptions = 
+const kRenderTargetResolutionOptions: Record<string, number[]> = 
 {
-    '480': 480,
-    '720': 720,
-    '1080': 1080,
-    '1440': 1440,
-    '1920': 1920,
-    '2160': 2160,
-}
-
+    '360p': [540, 360],
+    '480p': [720, 480],
+    '720p': [1080, 720],
+    '1080p': [1920, 1080],
+    '2K': [2560, 1440],
+    '4K': [3840, 2160],
+};
 
 export class Application 
 {
-    @UIBinding({category: "Application", bindingParams: { label: "Resolution X", min: 1, max: 3840, step:1, format: (value: number) => { return value.toFixed(); }, options: kRenderTargetWidthOptions } })
-    private renderTargetWidth: number = 1920;
-    @UIBinding({category: "Application", bindingParams: { label: "Resolution Y", min: 1, max: 2160, step:1, format: (value: number) => { return value.toFixed(); }, options: kRenderTargetHeightOptions } })
-    private renderTargetHeight: number = 1080;
+    @UIBinding({category: "Application", bindingParams: { label: "Render Target Resolution", options: kRenderTargetResolutionOptionsList } })
+    private renderTargetResolutionOption: string = '1080p';
+
+    private renderTargetWidth: number = kRenderTargetResolutionOptions[this.renderTargetResolutionOption][0];
+    private renderTargetHeight: number = kRenderTargetResolutionOptions[this.renderTargetResolutionOption][1];
     
     private engine: BABYLON.Engine;
     private sceneManager!: SceneManager;
@@ -76,11 +73,9 @@ export class Application
     {
         this.inspector.RegisterTarget(this, (property: string, value: any) => {
             switch (property) {
-                case 'renderTargetWidth':
-                    this.renderTargetWidth = value;
-                    break;
-                case 'renderTargetHeight':
-                    this.renderTargetHeight = value;
+                case 'renderTargetResolutionOption':
+                    this.renderTargetWidth = kRenderTargetResolutionOptions[value][0];
+                    this.renderTargetHeight = kRenderTargetResolutionOptions[value][1];
                     break;
             }
         });
