@@ -33,6 +33,22 @@ const kFolderPath_Debug = kTabPagePath_General + "/@Debug";
 const kFolderPath_Application = kTabPagePath_General + "/@Application";
 
 
+class KeyControlInfo
+{
+    @UIBinding({ category: "Key Control", bindingParams: { label: "Play/Pause", readonly: true } })
+    public applicationPlayPauseKey: string = 'Space';
+    @UIBinding({ category: "Key Control", bindingParams: { label: "Video Play/Pause", readonly: true } })
+    public videoPlayPauseKey: string = 'V';
+    @UIBinding({ category: "Key Control", bindingParams: { label: "Restart Simulation", readonly: true } })
+    public restartSimulationKey: string = 'R';
+    @UIBinding({ category: "Key Control", bindingParams: { label: "Toggle Inspector", readonly: true } })
+    public inspectorToggleKey: string = 'P';
+    @UIBinding({ category: "Key Control", bindingParams: { label: "Reflection Board Move Left", readonly: true } })
+    public reflectionBoardMoveLeft: string = 'A or <-';
+    @UIBinding({ category: "Key Control", bindingParams: { label: "Reflection Board Move Right", readonly: true } })
+    public reflectionBoardMoveRight: string = 'D or ->';
+}
+
 export class Application 
 {
     @UIBinding({ category: "Application", bindingParams: { label: "Render Target Resolution", options: kRenderTargetResolutionOptionsList } })
@@ -50,6 +66,8 @@ export class Application
 
     private _isPaused: boolean = false;
     private fpsGraph: any = null;
+    private playStateText : any = null;
+    private keyControlInfo: KeyControlInfo = new KeyControlInfo();
 
     constructor(readonly canvas: HTMLCanvasElement) {
         this.engine = new BABYLON.WebGPUEngine(canvas) as any;
@@ -80,6 +98,9 @@ export class Application
     private RegisterUITargets(): void
     {
         this.inspector.BeginContainerPathScope(kTabPagePath_General);
+        this.inspector.RegisterTarget(this.keyControlInfo, (property: string, value: any) => {
+
+        });
         this.inspector.RegisterTarget(this, (property: string, value: any) => {
             switch (property) {
                 case 'renderTargetResolutionOption':
@@ -89,7 +110,14 @@ export class Application
             }
         });
         this.inspector.RegisterTarget(this.videoManager, (property: string, value: any) => {
-            this.videoManager.handlePropertyChange(property, value);
+            switch (property) {
+                case 'playPause':
+                    this.ToggleVideoPlayPause();
+                    break;
+                case 'volume':
+                    this.videoManager.SetAudioVolume(value);
+                    break;
+            }
         });
         this.inspector.RegisterTarget(this.jumpFloodingSDFGenerator.params, (property: string, value: any) => {
             switch (property) {
@@ -122,29 +150,32 @@ export class Application
 
         this.inspector.BuildUIComponents();
 
-        (this.inspector.tree!.GetFolder(kFolderPath_Application)!.addBlade({
+        const applicationFolder = this.inspector.tree!.GetFolder(kFolderPath_Application)!;
+        const playPauseButtonGrid : any = applicationFolder.addBlade({
             view: 'buttongrid',
             size: [2, 1],
             cells: (x: number, y: number) => ({
               title: [
-                ['Play/Pause', 'Reset'],
+                ['Play/Pause', 'Restart'],
               ][y][x],
             }),
-          }) as any)
-          .on('click', (ev: any) => {
+          });
+          playPauseButtonGrid.on('click', (ev: any) => {
                 if (ev.index[0] === 0)
                 {
-                    this._isPaused = !this._isPaused;
-                    this.videoManager.TogglePlayPause();
+                    this.ToggleApplicationPause();
                 }
                 else if (ev.index[0] === 1)
                 {
-                    this._isPaused = false;
-                    this.videoManager.Restart();
-                    this.pixelBreakerManager.Reset();
+                    this.Restart();
                 }
           });
 
+        this.playStateText = applicationFolder.addBlade({
+            view: 'text',
+            parse: (v: any) => String(v),
+            value: 'Play State',
+          });
 
         this.fpsGraph = (this.inspector.tree!.GetFolder(kFolderPath_Debug))!.addBlade({
             view: 'fpsgraph',
@@ -152,13 +183,83 @@ export class Application
         });
     }
 
-    SetUpBabylonDebugLayer(debugOn: boolean = true): void 
+    private ToggleApplicationPause(): void
+    {
+        this._isPaused = !this._isPaused;
+        if (this._isPaused === this.videoManager.IsPaused())
+            return;
+        this.videoManager.TogglePlayPause();
+    }
+
+    private ToggleVideoPlayPause(): void
+    {
+        if (this._isPaused)
+            return;
+        this.videoManager.TogglePlayPause();
+    }
+
+    private Restart(): void
+    {
+        this._isPaused = false;
+        this.videoManager.Restart();
+        this.pixelBreakerManager.Reset();
+    }
+
+    private SetUpBabylonDebugLayer(debugOn: boolean = true): void 
     {
         if (debugOn) {
             this.sceneManager.scene.debugLayer.show({ overlay: true });
         } else {
             this.sceneManager.scene.debugLayer.hide();
         }
+    }
+
+    private SetUpInputActions(): void
+    {
+        this.sceneManager.scene.actionManager = new BABYLON.ActionManager(this.sceneManager.scene);
+        // keyword P to toggle inspector
+        this.sceneManager.scene.actionManager.registerAction(
+            new BABYLON.ExecuteCodeAction(
+                {
+                  trigger: BABYLON.ActionManager.OnKeyDownTrigger,
+                  parameter: "p",
+                },
+                () => { this.inspector.Toggle(); }
+              )
+        );
+
+        // keyboard space to toggle application pause
+        this.sceneManager.scene.actionManager.registerAction(
+            new BABYLON.ExecuteCodeAction(
+                {
+                  trigger: BABYLON.ActionManager.OnKeyDownTrigger,
+                  parameter: " ",
+                },
+                () => { this.ToggleApplicationPause(); }
+              )
+        );
+
+        // keyboard v to toggle video play pause
+        this.sceneManager.scene.actionManager.registerAction(
+            new BABYLON.ExecuteCodeAction(
+                {
+                  trigger: BABYLON.ActionManager.OnKeyDownTrigger,
+                  parameter: "v",
+                },
+                () => { this.ToggleVideoPlayPause(); }
+              )
+        );
+
+        // keyboard r to restart application
+        this.sceneManager.scene.actionManager.registerAction(
+            new BABYLON.ExecuteCodeAction(
+                {
+                  trigger: BABYLON.ActionManager.OnKeyDownTrigger,
+                  parameter: "r",
+                },
+                () => { this.Restart(); }
+              )
+        );
     }
 
     async Run(): Promise<void> 
@@ -169,6 +270,8 @@ export class Application
         this.InitializeManagers();
         
         this.SetUpBabylonDebugLayer(false);
+
+        this.SetUpInputActions();
         
         this.engine.runRenderLoop(() => {
             this.fpsGraph!.begin();
@@ -190,6 +293,8 @@ export class Application
 
             this.sceneManager.render(this.pixelBreakerManager.renderMaterial!);
             this.fpsGraph!.end();
+
+            this.playStateText.value = this._isPaused ? 'Application is Paused' : 'Application is Playing';
         });
     }
 

@@ -43,6 +43,14 @@ export class VideoManager
         this.videoTexture.vScale = 1.0;
     }
 
+    public IsPaused(): boolean
+    {
+        const videoElement = this.videoTexture?.video;
+        if (!videoElement) 
+            throw new Error('Video element not found');
+        return videoElement.paused;
+    }
+
     public TogglePlayPause(): void 
     {
         const videoElement = this.videoTexture?.video;

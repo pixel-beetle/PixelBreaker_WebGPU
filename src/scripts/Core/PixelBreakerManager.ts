@@ -117,7 +117,7 @@ export class PixelBreakerParticlesParams
     public staticParticleSpawnRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.8, 1.0);
     
     @UIBinding({containerPath: "#T/%Spawn/@Dynamic Particle", bindingParams: { label: "Spawn Count", min:0, format: (value: number) => { return value.toFixed(); } } })
-    public dynamicParticleInitialCount: number = 10000;
+    public dynamicParticleInitialCount: number = 1000000;
 
     @UIBinding({containerPath: "#T/%Spawn/@Dynamic Particle", bindingParams: { label: "Spawn Speed", min:0 } })
     public dynamicParticleInitialSpeed : number = 500;

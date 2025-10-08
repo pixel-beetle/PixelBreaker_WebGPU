@@ -66,6 +66,11 @@ export class ReflectedInspector
     }
 
 
+    public Toggle(): void
+    {
+        this._pane.hidden = !this._pane.hidden;
+    }
+
     private _customContainerScope: string | null = null;
 
     public BeginContainerPathScope(path: string): void
