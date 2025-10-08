@@ -3,7 +3,7 @@
 import { Gradient } from 'tweakpane-plugin-gradient';
 import * as BABYLON from 'babylonjs';
 
-export class GradientEx
+export class GradientUtils
 {
     public static Monochrome(valueStart01: number, valueEnd01: number) : Gradient
     {

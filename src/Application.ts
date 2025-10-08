@@ -27,8 +27,9 @@ const kRenderTargetResolutionOptions: Record<string, number[]> =
 };
 
 const kTabPagePath_General = "#RootTab/%General";
+const kTabPagePath_Board = "#RootTab/%Board";
 const kTabPagePath_Particles = "#RootTab/%Particles";
-const kTabPagePath_Debug = "#RootTab/%Debug";
+const kFolderPath_Debug = kTabPagePath_General + "/@Debug";
 const kFolderPath_Application = kTabPagePath_General + "/@Application";
 
 
@@ -107,7 +108,13 @@ export class Application
         });
         this.inspector.EndContainerPathScope();
 
-        this.inspector.BeginContainerPathScope(kTabPagePath_Debug);
+        this.inspector.BeginContainerPathScope(kTabPagePath_Board);
+        this.inspector.RegisterTarget(this.pixelBreakerManager.boardParams, (property: string, value: any) => {
+            this.pixelBreakerManager.boardParams.HandlePropertyChange(property, value, this.pixelBreakerManager);
+        });
+        this.inspector.EndContainerPathScope();
+
+        this.inspector.BeginContainerPathScope(kFolderPath_Debug);
         this.inspector.RegisterTarget(this.pixelBreakerManager.particleCountReadback, (property: string, value: any) => {
             
         });
@@ -139,7 +146,7 @@ export class Application
           });
 
 
-        this.fpsGraph = (this.inspector.tree!.GetTabPage(kTabPagePath_Debug))!.addBlade({
+        this.fpsGraph = (this.inspector.tree!.GetFolder(kFolderPath_Debug))!.addBlade({
             view: 'fpsgraph',
             label: 'FPS',
         });

@@ -10,7 +10,7 @@ import pixelBreakerRenderVS from "../../Shaders/PixelBreaker.render.vs.wgsl";
 import pixelBreakerRenderFS from "../../Shaders/PixelBreaker.render.fs.wgsl";
 import { SharedTextureSamplerCollection } from "../GfxUtils/SharedTextureSampler";
 import { UIBinding, UIGradient } from '../GUI/UIProperty';
-import { GradientEx, GradientTexture } from '../GfxUtils/ColorGradient';
+import { GradientUtils, GradientTexture } from '../GfxUtils/ColorGradient';
 import { GradientBladeParams, Gradient } from 'tweakpane-plugin-gradient';
 
 
@@ -60,8 +60,56 @@ export class ParticleCountReadbackBuffer
     }
 }
 
+export class PixelBreakerBoardParams
+{
+    @UIBinding({bindingParams: { label: "Y Position", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
+    public reflectionBoardPosY01: number = 0.1;
+    @UIBinding({bindingParams: { label: "Size", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
+    public reflectionBoardSize01 : BABYLON.Vector2 = new BABYLON.Vector2(0.2, 0.02);
+    @UIBinding({bindingParams: { label: "Color", color : { type: 'float' } } } )
+    public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.95, 0.27, 0.74, 1.0);
 
-export class PixelBreakerParams
+    private _reflectionBoardPosX01 : number = 0.5;
+
+    public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.12);
+    public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.14);
+
+    private UpdateReflectionBoardRect()
+    {
+        let centerY = this.reflectionBoardPosY01;
+        let size = this.reflectionBoardSize01;
+        let centerX = this._reflectionBoardPosX01;
+
+        let minX = centerX - size.x * 0.5;
+        let maxX = centerX + size.x * 0.5;
+        let minY = centerY - size.y * 0.5;
+        let maxY = centerY + size.y * 0.5;
+
+        this.reflectionBoardRectMin01 = new BABYLON.Vector2(minX, minY);
+        this.reflectionBoardRectMax01 = new BABYLON.Vector2(maxX, maxY);
+    }
+
+    public HandlePropertyChange(property: string, value: any, pixelBreakerManager: PixelBreakerManager)
+    {
+        switch (property) 
+        {
+            case "reflectionBoardPosY01":
+                this.reflectionBoardPosY01 = value;
+                this.UpdateReflectionBoardRect();
+                break;
+            case "reflectionBoardSize01":
+                this.reflectionBoardSize01 = value;
+                this.UpdateReflectionBoardRect();
+                break;
+            case "reflectionBoardColor":
+                this.reflectionBoardColor = value;
+                break;
+        }
+    }
+}
+
+
+export class PixelBreakerParticlesParams
 {
     @UIBinding({containerPath: "#T/%Spawn/@Static Particle", bindingParams: { label: "Spawn Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
     public staticParticleSpawnRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.2, 0.3);
@@ -75,7 +123,7 @@ export class PixelBreakerParams
     public dynamicParticleInitialSpeed : number = 500;
 
     @UIGradient({containerPath: "#T/%Spawn/@Color", label: "Particle Spawn Color" })
-    public particleSpawnColorGradient: Gradient = GradientEx.HSV(64);
+    public particleSpawnColorGradient: Gradient = GradientUtils.HSV(24);
 
     @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Max Speed", min:0 } })
     public dynamicParticleMaxSpeed: number = 500;
@@ -114,20 +162,13 @@ export class PixelBreakerParams
 
 
     @UIGradient({containerPath: "#T/%Render/@Speed Visualize", label: "Color By Speed Gradient" })
-    public particleColorBySpeedGradient: Gradient = GradientEx.HSV(64);
+    public particleColorBySpeedGradient: Gradient = GradientUtils.HSV(24);
 
     @UIBinding({containerPath: "#T/%Render/@Speed Visualize", bindingParams: { label: "Color By Speed Remap Range" } })
     public colorBySpeedRamapRange: BABYLON.Vector2 = new BABYLON.Vector2(0, 500);
 
     @UIBinding({containerPath: "#T/%Render/@Speed Visualize", bindingParams: { label: "Color By Speed Factor", min: 0, max: 1, step: 0.01 } })
     public colorBySpeedFactor: number = 0.0;
-
-    @UIBinding({containerPath: "#T/%Board", bindingParams: { label: "Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
-    public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.12);
-    @UIBinding({containerPath: "#T/%Board", bindingParams: { label: "Rect Max", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
-    public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.14);
-    @UIBinding({containerPath: "#T/%Board", bindingParams: { label: "Color", color : { type: 'float' } } } )
-    public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.2, 0.2, 0.8, 1.0);
 
 
     public HandlePropertyChange(property: string, value: any, pixelBreakerManager: PixelBreakerManager)
@@ -142,15 +183,6 @@ export class PixelBreakerParams
                 break;
             case "staticParticleSpawnRectMax01":
                 this.staticParticleSpawnRectMax01 = value;
-                break;
-            case "reflectionBoardRectMin01":
-                this.reflectionBoardRectMin01 = value;
-                break;
-            case "reflectionBoardRectMax01":
-                this.reflectionBoardRectMax01 = value;
-                break;
-            case "reflectionBoardColor":
-                this.reflectionBoardColor = value;
                 break;
             case "colorChangeWhenCollideWithReflectionBoard":
                 this.colorChangeWhenCollideWithReflectionBoard = value;
@@ -210,7 +242,8 @@ export class PixelBreakerParams
 export class PixelBreakerManager
 {
     // Params
-    public params: PixelBreakerParams = new PixelBreakerParams();
+    public params: PixelBreakerParticlesParams = new PixelBreakerParticlesParams();
+    public boardParams: PixelBreakerBoardParams = new PixelBreakerBoardParams();
     public particleCountReadback: ParticleCountReadbackBuffer = new ParticleCountReadbackBuffer();
 
     public particleSpawnColorGradientTexture: GradientTexture | null = null;
@@ -517,12 +550,12 @@ export class PixelBreakerManager
             this.params.staticParticleSpawnRectMax01.y * this._renderTargetSizeInfo.height
         );
         this._reflectionBoardRectMin = new BABYLON.Vector2(
-            this.params.reflectionBoardRectMin01.x * this._renderTargetSizeInfo.width, 
-            this.params.reflectionBoardRectMin01.y * this._renderTargetSizeInfo.height
+            this.boardParams.reflectionBoardRectMin01.x * this._renderTargetSizeInfo.width, 
+            this.boardParams.reflectionBoardRectMin01.y * this._renderTargetSizeInfo.height
         );
         this._reflectionBoardRectMax = new BABYLON.Vector2(
-            this.params.reflectionBoardRectMax01.x * this._renderTargetSizeInfo.width, 
-            this.params.reflectionBoardRectMax01.y * this._renderTargetSizeInfo.height
+            this.boardParams.reflectionBoardRectMax01.x * this._renderTargetSizeInfo.width, 
+            this.boardParams.reflectionBoardRectMax01.y * this._renderTargetSizeInfo.height
         );
         
         const staticParticleSpawnRectMinMax = new BABYLON.Vector4(
@@ -538,7 +571,7 @@ export class PixelBreakerManager
             this._reflectionBoardRectMax.x, 
             this._reflectionBoardRectMax.y
         );
-        const reflectionBoardColor = new BABYLON.Vector4(this.params.reflectionBoardColor.r, this.params.reflectionBoardColor.g, this.params.reflectionBoardColor.b, this.params.reflectionBoardColor.a);
+        const reflectionBoardColor = new BABYLON.Vector4(this.boardParams.reflectionBoardColor.r, this.boardParams.reflectionBoardColor.g, this.boardParams.reflectionBoardColor.b, this.boardParams.reflectionBoardColor.a);
         this._computeUBO.updateVector4("_StaticParticleSpawnRectMinMax", staticParticleSpawnRectMinMax);
         this._computeUBO.updateVector4("_ReflectionBoardRectMinMax", reflectionBoardRectMinMax);
         this._computeUBO.updateVector4("_ReflectionBoardColor", reflectionBoardColor);
@@ -567,7 +600,7 @@ export class PixelBreakerManager
         if (!this._renderUBO)
             return;
 
-        const reflectionBoardColor = new BABYLON.Vector4(this.params.reflectionBoardColor.r, this.params.reflectionBoardColor.g, this.params.reflectionBoardColor.b, this.params.reflectionBoardColor.a);
+        const reflectionBoardColor = new BABYLON.Vector4(this.boardParams.reflectionBoardColor.r, this.boardParams.reflectionBoardColor.g, this.boardParams.reflectionBoardColor.b, this.boardParams.reflectionBoardColor.a);
         const reflectionBoardRectMinMax = new BABYLON.Vector4(
             this._reflectionBoardRectMin.x, 
             this._reflectionBoardRectMin.y, 

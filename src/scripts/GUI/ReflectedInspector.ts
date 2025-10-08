@@ -116,9 +116,13 @@ export class ReflectedInspector
     private GetFallbackContainerPath(property: UIPropertyMetadata): string
     {
         // path format: #tab/@page/%folder/leafNode
-        if (property.options.category)
+        if (property.options.category !== undefined && property.options.category !== null)
         {
             return UI_PATH_PREFIX_FOLDER + property.options.category;
+        }
+        if (this._customContainerScope)
+        {
+            return "";
         }
         return UI_PATH_PREFIX_FOLDER + 'DefaultContainer';
     }
