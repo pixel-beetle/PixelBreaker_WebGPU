@@ -883,8 +883,15 @@ fn SoftwareRasterizeDynamicParticles(@builtin(global_invocation_id) globalId: ve
 
     // color.a as sorting index
     var sortingIndex = particleState.color.a;
-    sortingIndex = cos(sortingPeakCount * 3.14 * sortingIndex + _Uniforms._Time * sortingChangeSpeed);
-    sortingIndex = saturate(sortingIndex * 0.5 + 0.5);
+    if (_Uniforms._ColorBySpeedParams.w > 0.0001)
+    {
+        sortingIndex = speedRemap;
+    }
+    else
+    {
+        sortingIndex = cos(sortingPeakCount * 3.14 * sortingIndex + _Uniforms._Time * sortingChangeSpeed);
+        sortingIndex = saturate(sortingIndex * 0.5 + 0.5);
+    }
 
     color.a = sortingIndex;
     let packedColor = PackColor(color);
