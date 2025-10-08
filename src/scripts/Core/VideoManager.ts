@@ -1,31 +1,40 @@
 import * as BABYLON from 'babylonjs';
-import { UIBinding, UIButton } from '../GUI/UIProperty';
 
 export class VideoManager 
 {
     public videoTexture: BABYLON.VideoTexture | null = null;
-    
-    @UIButton( { category: 'Video', buttonParams: { title: 'Video Play/Pause' } })
-    public playPause: boolean = false;
 
-    @UIBinding( { category: 'Video', bindingParams: { label: 'Volume', min: 0, max: 1, step: 0.01 } })
     public volume: number = 0.5;
 
-    constructor(private scene: BABYLON.Scene, videoSrc: string) 
+    public videoElement: HTMLVideoElement | null = null;
+
+    constructor(private scene: BABYLON.Scene) 
     {
-        this.SetupVideo(videoSrc);
+        
     }
 
-    private SetupVideo(videoSrc: string): void 
+    public SetupVideo(videoSrc: string): void 
     {
+        this.videoElement = document.createElement('video');
+        this.videoElement.src = videoSrc;
+        this.videoElement.controls = true;
+        this.videoElement.autoplay = false;
+        this.videoElement.loop = true;
+        this.videoElement.muted = this.volume === 0;
+        this.videoElement.style.position = 'relative';
+        this.videoElement.style.top = '0';
+        this.videoElement.style.left = '0';
+        this.videoElement.style.width = '100%';
+        this.videoElement.style.height = '100%';
+
         this.videoTexture = new BABYLON.VideoTexture("videoTexture", 
-            videoSrc, 
+            this.videoElement, 
             this.scene,
             false,
             false,
             BABYLON.Texture.TRILINEAR_SAMPLINGMODE,
-            { 
-                autoPlay: true,
+            {
+                autoPlay: false,
                 loop: true,
                 muted: this.volume === 0,
                 autoUpdateTexture: true,
@@ -67,8 +76,6 @@ export class VideoManager
         {
             videoElement.pause();
         }
-
-        this.playPause = !videoElement.paused;
     }
 
     public Restart(): void 
@@ -94,20 +101,6 @@ export class VideoManager
             videoElement.muted = false;
         }
     }
-
-    public handlePropertyChange(property: string, value: any): void 
-    {
-        switch (property) 
-        {
-            case 'playPause':
-                this.TogglePlayPause();
-                break;
-            case 'volume':
-                this.SetAudioVolume(value);
-                break;
-        }
-    }
-
 
     public dispose(): void 
     {

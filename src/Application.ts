@@ -64,7 +64,7 @@ export class Application
     private jumpFloodingSDFGenerator!: JumpFloodingSDFGenerator;
     private pixelBreakerManager!: PixelBreakerManager;
 
-    private _isPaused: boolean = false;
+    private _isPaused: boolean = true;
     private fpsGraph: any = null;
     private playStateText : any = null;
     private keyControlInfo: KeyControlInfo = new KeyControlInfo();
@@ -88,11 +88,15 @@ export class Application
 
 
         this.sceneManager = new SceneManager(this.engine, this.canvas, this.renderTargetWidth / this.renderTargetHeight);
-        this.videoManager = new VideoManager(this.sceneManager.scene, './BadApple_Video.mp4');
+        this.videoManager = new VideoManager(this.sceneManager.scene);
         this.jumpFloodingSDFGenerator = new JumpFloodingSDFGenerator();
         this.pixelBreakerManager = new PixelBreakerManager();
 
         this.RegisterUITargets();
+
+        this.videoManager.SetupVideo('./BadApple_Video.mp4');
+        const videoParentNode = this.inspector.tree?.GetTabPage(kTabPagePath_General)!;
+        videoParentNode.element.appendChild(this.videoManager.videoElement!);
     }
 
     private RegisterUITargets(): void
@@ -320,7 +324,6 @@ export class Application
         });
     }
 
-    // 清理资源
     dispose(): void 
     {
         this.inspector.dispose();
