@@ -105,7 +105,7 @@ export class Application
     
         this.inspector.BuildUIComponents();
 
-        (this.inspector.uiBuilder.tree!.GetFolder('@Application')!.addBlade({
+        (this.inspector.tree!.GetFolder('@Application')!.addBlade({
             view: 'buttongrid',
             size: [2, 1],
             cells: (x: number, y: number) => ({

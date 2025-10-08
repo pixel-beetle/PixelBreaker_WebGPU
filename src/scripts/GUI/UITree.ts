@@ -1,20 +1,12 @@
 import { BindingParams, FolderApi, TabApi, TabPageApi, Pane } from 'tweakpane';
 import { UIPropertyMetadata, GetUIProperties, ButtonOptions, BindingOptions, GradientOptions } from './UIProperty';
-import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
-import { Gradient, GradientBladeApi, GradientBladeParams, GradientPluginBundle } from 'tweakpane-plugin-gradient';
+import { Gradient, GradientBladeApi, GradientBladeParams } from 'tweakpane-plugin-gradient';
 import { BindingApi, ButtonApi } from '@tweakpane/core';
 
 
-export interface UIBuilderOptions {
-    title?: string;
-    position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
-    expanded?: boolean;
-}
-
-
-const UI_PATH_PREFIX_TAB = '#';
-const UI_PATH_PREFIX_PAGE = '%';
-const UI_PATH_PREFIX_FOLDER = '@';
+export const UI_PATH_PREFIX_TAB = '#';
+export const UI_PATH_PREFIX_PAGE = '%';
+export const UI_PATH_PREFIX_FOLDER = '@';
 
 
 export class UITree
@@ -339,90 +331,6 @@ export class UILeafNode extends UINode
         catch (error) 
         {
             console.warn(`Failed to create control for property ${propertyKey}:`, error);
-        }
-    }
-}
-
-export class UIBuilder 
-{
-    private _pane: Pane;
-    public get pane(): Pane 
-    {
-        return this._pane;
-    }
-
-    private _tree: UITree | null = null;
-    public get tree(): UITree | null
-    {
-        return this._tree;
-    }
-
-    constructor(options: UIBuilderOptions = {}) 
-    {
-        this._pane = new Pane({
-            title: options.title || 'Control Panel',
-            expanded: options.expanded !== false
-        });
-        this._pane.registerPlugin(EssentialsPlugin);
-        this._pane.registerPlugin(GradientPluginBundle);
-        this._tree = new UITree(this._pane);
-    }
-
-
-    private GetFallbackContainerPath(property: UIPropertyMetadata): string
-    {
-        // path format: #tab/@page/%folder/leafNode
-        if (property.options.category)
-        {
-            return UI_PATH_PREFIX_FOLDER + property.options.category;
-        }
-        return UI_PATH_PREFIX_FOLDER + 'DefaultContainer';
-    }
-
-    public RegisterTarget(target: any, 
-            properties: UIPropertyMetadata[],
-            options: { onPropertyChange?: (property: string, value: any) => void } = {}): void 
-    {
-        let nodePathToProperties: Map<string, UIPropertyMetadata> = new Map();
-        for (const property of properties)
-        {
-            let nodePath = property.options.containerPath;
-            if (!property.options.containerPath)
-            {
-                nodePath = this.GetFallbackContainerPath(property);
-            }
-            nodePath = nodePath + '/' + property.propertyKey;
-            nodePath = nodePath.replace(/^\/+/, '');
-            nodePathToProperties.set(nodePath, property);
-        }
-
-        let nodes = this._tree!.GetOrCreateNodesFromPaths(Array.from(nodePathToProperties.keys()));
-        for (const node of nodes)
-        {
-            if (node instanceof UILeafNode)
-            {
-                node.propertyMeta = nodePathToProperties.get(node.nodePath)!;
-                node.target = target;
-                node.onPropertyChange = options.onPropertyChange || null;
-            }
-        }
-    }
-
-    public BuildUIComponents()
-    {
-        this._tree!.RebuildUIComponentsIfNeeded();
-    }
-
-    get element(): HTMLElement 
-    {
-        return this._pane.element;
-    }
-
-    dispose(): void 
-    {
-        if (this._pane) 
-        {
-            this._pane.dispose();
         }
     }
 }

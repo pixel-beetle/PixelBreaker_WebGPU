@@ -1,40 +1,64 @@
-import { UIBuilder, UIBuilderOptions } from './UIBuilder';
-import { GetUIProperties } from './UIProperty';
 
-export interface ReflectedInspectorOptions extends UIBuilderOptions {
+import { GetUIProperties, UIPropertyMetadata } from './UIProperty';
+import { Pane } from 'tweakpane';
+import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
+import { GradientPluginBundle } from 'tweakpane-plugin-gradient';
+import { UITree, UILeafNode, UI_PATH_PREFIX_FOLDER } from './UITree';
+
+export interface ReflectedInspectorOptions 
+{
+    title?: string;
+    position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
+    expanded?: boolean;
     autoRefresh?: boolean;
     refreshInterval?: number;
 }
 
 export class ReflectedInspector 
 {
-    private _uiBuilder: UIBuilder;
-    public get uiBuilder(): UIBuilder 
-    {
-        return this._uiBuilder;
-    }
     private _targets: Set<any> = new Set();
     private _refreshTimer?: number;
     private _options: ReflectedInspectorOptions;
 
+    private _pane: Pane;
+    public get pane(): Pane 
+    {
+        return this._pane;
+    }
+
+    public get element(): HTMLElement 
+    {
+        return this._pane.element;
+    }
+
+    private _tree: UITree | null = null;
+    public get tree(): UITree | null
+    {
+        return this._tree;
+    }
+
     constructor(options: ReflectedInspectorOptions = {}) 
     {
-        this._options = {
-            autoRefresh: false,
-            refreshInterval: 100,
-            ...options
-        };
+        this._options = options;
+        this._pane = new Pane({
+            title: options.title || 'Control Panel',
+            expanded: options.expanded !== false
+        });
 
-        this._uiBuilder = new UIBuilder(options);
+        this._pane.registerPlugin(EssentialsPlugin);
+        this._pane.registerPlugin(GradientPluginBundle);
+
+        this._tree = new UITree(this._pane);
         this.SetupResponsive();
     }
 
     private SetupResponsive(): void 
     {
         const mediaQuery = window.matchMedia('(max-width: 768px)');
-        const handleResponsive = (e: MediaQueryListEvent | MediaQueryList) => {
+        const handleResponsive = (e: MediaQueryListEvent | MediaQueryList) => 
+        {
             const matches = e.matches;
-            this._uiBuilder.element.style.width = matches ? '300px' : 'auto';
+            this.element.style.width = matches ? '300px' : 'auto';
         };
         
         mediaQuery.addEventListener('change', handleResponsive);
@@ -55,7 +79,7 @@ export class ReflectedInspector
             return;
         }
 
-        this._uiBuilder.RegisterTarget(target, properties, { onPropertyChange });
+        this.RegisterTargetWithProperties(target, properties, { onPropertyChange });
 
         if (this._options.autoRefresh && !this._refreshTimer) 
         {
@@ -73,9 +97,48 @@ export class ReflectedInspector
         }
     }
 
-    public BuildUIComponents(): void 
+    private GetFallbackContainerPath(property: UIPropertyMetadata): string
     {
-        this._uiBuilder.BuildUIComponents();
+        // path format: #tab/@page/%folder/leafNode
+        if (property.options.category)
+        {
+            return UI_PATH_PREFIX_FOLDER + property.options.category;
+        }
+        return UI_PATH_PREFIX_FOLDER + 'DefaultContainer';
+    }
+
+    public RegisterTargetWithProperties(target: any, 
+            properties: UIPropertyMetadata[],
+            options: { onPropertyChange?: (property: string, value: any) => void } = {}): void 
+    {
+        let nodePathToProperties: Map<string, UIPropertyMetadata> = new Map();
+        for (const property of properties)
+        {
+            let nodePath = property.options.containerPath;
+            if (!property.options.containerPath)
+            {
+                nodePath = this.GetFallbackContainerPath(property);
+            }
+            nodePath = nodePath + '/' + property.propertyKey;
+            nodePath = nodePath.replace(/^\/+/, '');
+            nodePathToProperties.set(nodePath, property);
+        }
+
+        let nodes = this._tree!.GetOrCreateNodesFromPaths(Array.from(nodePathToProperties.keys()));
+        for (const node of nodes)
+        {
+            if (node instanceof UILeafNode)
+            {
+                node.propertyMeta = nodePathToProperties.get(node.nodePath)!;
+                node.target = target;
+                node.onPropertyChange = options.onPropertyChange || null;
+            }
+        }
+    }
+
+    public BuildUIComponents()
+    {
+        this._tree!.RebuildUIComponentsIfNeeded();
     }
 
     public Refresh(): void 
@@ -101,23 +164,10 @@ export class ReflectedInspector
         }
     }
 
-
-    get builder(): UIBuilder 
-    {
-        return this._uiBuilder;
-    }
-
-
-    get element(): HTMLElement 
-    {
-        return this._uiBuilder.element;
-    }
-
-
     dispose(): void 
     {
         this.StopAutoRefresh();
-        this._uiBuilder.dispose();
+        this._pane.dispose();
         this._targets.clear();
     }
 }
