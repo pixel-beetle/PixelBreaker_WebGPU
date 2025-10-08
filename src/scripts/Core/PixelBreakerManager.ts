@@ -112,7 +112,7 @@ export class PixelBreakerBoardParams
 export class PixelBreakerParticlesParams
 {
     @UIBinding({containerPath: "#T/%Spawn/@Static Particle", bindingParams: { label: "Spawn Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
-    public staticParticleSpawnRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.2, 0.3);
+    public staticParticleSpawnRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.2, 0.2);
     @UIBinding({containerPath: "#T/%Spawn/@Static Particle", bindingParams: { label: "Spawn Rect Max", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
     public staticParticleSpawnRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.8, 1.0);
     
@@ -120,13 +120,13 @@ export class PixelBreakerParticlesParams
     public dynamicParticleInitialCount: number = 1000000;
 
     @UIBinding({containerPath: "#T/%Spawn/@Dynamic Particle", bindingParams: { label: "Spawn Speed", min:0 } })
-    public dynamicParticleInitialSpeed : number = 500;
+    public dynamicParticleInitialSpeed : number = 300;
 
     @UIGradient({containerPath: "#T/%Spawn/@Color", label: "Particle Spawn Color" })
     public particleSpawnColorGradient: Gradient = GradientUtils.HSV(24);
 
     @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Max Speed", min:0 } })
-    public dynamicParticleMaxSpeed: number = 500;
+    public dynamicParticleMaxSpeed: number = 800;
 
     @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Use Fixed Speed", min:0 } })
     public dynamicParticleUseFixedSpeed : boolean = false;
@@ -138,14 +138,14 @@ export class PixelBreakerParticlesParams
     @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Enable", type: 'boolean' } })
     public useDistanceFieldForce : boolean = true;
     @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Collision Strength" } })
-    public distanceFieldCollisionStrength : number = 100;
+    public distanceFieldCollisionStrength : number = 500;
     @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Swirl Strength" } })
-    public distanceFieldSwirlStrength : number = 10;
+    public distanceFieldSwirlStrength : number = 15;
 
     @UIBinding({containerPath: "#T/%Update/@Force By Color", bindingParams: { label: "Force Strength" } })
     public forceByColorStrength : number = 5.0;
 
-    @UIBinding({containerPath: "#T/%Update/@Force By Color", bindingParams: { label: "Change Speed", min: 0, max: 5, step: 0.01 } })
+    @UIBinding({containerPath: "#T/%Update/@Force By Color", bindingParams: { label: "Change Speed over Time", min: 0, max: 5, step: 0.01 } })
     public forceByColorChangeSpeed: number = 1.5;
 
     @UIBinding({containerPath: "#T/%Update/@Color Change when Collide With", bindingParams: { label: "Reflection Board", min: 0, max: 1, step: 0.01 } })
@@ -155,10 +155,10 @@ export class PixelBreakerParticlesParams
     public colorChangeWhenCollideWithStaticParticle : number = 0;
 
     @UIBinding({containerPath: "#T/%Render", bindingParams: { label: "Render Size", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
-    public dynamicParticleSize: number = 4.0;
+    public dynamicParticleSize: number = 3;
 
-    @UIBinding({containerPath: "#T/%Render", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 0.5, step: 0.001 } })
-    public trailFadeRate : number = 0.05;
+    @UIBinding({containerPath: "#T/%Render", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 0.8, step: 0.001 } })
+    public trailFadeRate : number = 0.2;
 
 
     @UIGradient({containerPath: "#T/%Render/@Speed Visualize", label: "Color By Speed Gradient" })
