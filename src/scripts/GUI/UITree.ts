@@ -204,20 +204,34 @@ export class UIContainerNode extends UINode
                 switch (thisContainerType)
                 {
                     case UI_PATH_PREFIX_TAB:
-                        if (parentUIContainer instanceof Pane || parentUIContainer instanceof FolderApi)
+                        if (parentUIContainer instanceof Pane || parentUIContainer instanceof FolderApi || parentUIContainer instanceof TabPageApi)
+                        {
+                            let pageConfigs = [];
+                            for (const child of this.children)
+                            {
+                                if (child instanceof UIContainerNode && child.name[0] === UI_PATH_PREFIX_PAGE)
+                                    pageConfigs.push({
+                                        title: child.name.slice(1)
+                                    });
+                            }
                             this.uiContainer = parentUIContainer.addTab({
-                                pages: []
+                                pages: pageConfigs
                             });
+                        }
                         else
-                            throw new Error('Only Pane and FolderApi can add Tab');
+                            throw new Error('Only Pane and FolderApi and TabPageApi can add Tab');
                         break;
                     case UI_PATH_PREFIX_PAGE:
+                        // Page is created by Parent Tab, so just fetch it
                         if (parentUIContainer instanceof TabApi)
-                            this.uiContainer = parentUIContainer.addPage({
-                                title: thisContainerName
-                            });
+                        {
+                            let page = parentUIContainer.pages.find(page => page.title === thisContainerName);
+                            if (!page)
+                                throw new Error('Page with title ' + thisContainerName + ' not found');
+                            this.uiContainer = page;
+                        }
                         else
-                            throw new Error('Only Pane and FolderApi can add Page');
+                            throw new Error('Only TabApi can add Page');
                         break;
                     case UI_PATH_PREFIX_FOLDER:
                         if (parentUIContainer instanceof Pane || parentUIContainer instanceof FolderApi || parentUIContainer instanceof TabPageApi)

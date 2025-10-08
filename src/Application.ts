@@ -26,9 +26,15 @@ const kRenderTargetResolutionOptions: Record<string, number[]> =
     '4K': [3840, 2160],
 };
 
+const kTabPagePath_General = "#RootTab/%General";
+const kTabPagePath_Particles = "#RootTab/%Particles";
+const kTabPagePath_Debug = "#RootTab/%Debug";
+const kFolderPath_Application = kTabPagePath_General + "/@Application";
+
+
 export class Application 
 {
-    @UIBinding({category: "Application", bindingParams: { label: "Render Target Resolution", options: kRenderTargetResolutionOptionsList } })
+    @UIBinding({ category: "Application", bindingParams: { label: "Render Target Resolution", options: kRenderTargetResolutionOptionsList } })
     private renderTargetResolutionOption: string = '1080p';
 
     private renderTargetWidth: number = kRenderTargetResolutionOptions[this.renderTargetResolutionOption][0];
@@ -42,6 +48,7 @@ export class Application
     private pixelBreakerManager!: PixelBreakerManager;
 
     private _isPaused: boolean = false;
+    private fpsGraph: any = null;
 
     constructor(readonly canvas: HTMLCanvasElement) {
         this.engine = new BABYLON.WebGPUEngine(canvas) as any;
@@ -71,6 +78,7 @@ export class Application
 
     private RegisterUITargets(): void
     {
+        this.inspector.BeginContainerPathScope(kTabPagePath_General);
         this.inspector.RegisterTarget(this, (property: string, value: any) => {
             switch (property) {
                 case 'renderTargetResolutionOption':
@@ -79,11 +87,9 @@ export class Application
                     break;
             }
         });
-
         this.inspector.RegisterTarget(this.videoManager, (property: string, value: any) => {
             this.videoManager.handlePropertyChange(property, value);
         });
-
         this.inspector.RegisterTarget(this.jumpFloodingSDFGenerator.params, (property: string, value: any) => {
             switch (property) {
                 case 'inputValueThreshold':
@@ -92,20 +98,24 @@ export class Application
                 case 'inputInvert':
                     this.jumpFloodingSDFGenerator.params.inputInvert = value;
             }
-        
         });
+        this.inspector.EndContainerPathScope();
 
-        this.inspector.RegisterTarget(this.pixelBreakerManager.particleCountReadback, (property: string, value: any) => {
-            
-        });
-
+        this.inspector.BeginContainerPathScope(kTabPagePath_Particles);
         this.inspector.RegisterTarget(this.pixelBreakerManager.params, (property: string, value: any) => {
             this.pixelBreakerManager.params.HandlePropertyChange(property, value, this.pixelBreakerManager);
         });
-    
+        this.inspector.EndContainerPathScope();
+
+        this.inspector.BeginContainerPathScope(kTabPagePath_Debug);
+        this.inspector.RegisterTarget(this.pixelBreakerManager.particleCountReadback, (property: string, value: any) => {
+            
+        });
+        this.inspector.EndContainerPathScope();
+
         this.inspector.BuildUIComponents();
 
-        (this.inspector.tree!.GetFolder('@Application')!.addBlade({
+        (this.inspector.tree!.GetFolder(kFolderPath_Application)!.addBlade({
             view: 'buttongrid',
             size: [2, 1],
             cells: (x: number, y: number) => ({
@@ -127,6 +137,12 @@ export class Application
                     this.pixelBreakerManager.Reset();
                 }
           });
+
+
+        this.fpsGraph = (this.inspector.tree!.GetTabPage(kTabPagePath_Debug))!.addBlade({
+            view: 'fpsgraph',
+            label: 'FPS',
+        });
     }
 
     SetUpBabylonDebugLayer(debugOn: boolean = true): void 
@@ -148,6 +164,7 @@ export class Application
         this.SetUpBabylonDebugLayer(false);
         
         this.engine.runRenderLoop(() => {
+            this.fpsGraph!.begin();
             this.videoManager!.videoTexture!.update();
 
             if (!this._isPaused)
@@ -165,6 +182,7 @@ export class Application
             }
 
             this.sceneManager.render(this.pixelBreakerManager.renderMaterial!);
+            this.fpsGraph!.end();
         });
     }
 

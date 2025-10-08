@@ -66,6 +66,22 @@ export class ReflectedInspector
     }
 
 
+    private _customContainerScope: string | null = null;
+
+    public BeginContainerPathScope(path: string): void
+    {
+        if (this._customContainerScope)
+        {
+            throw new Error('Container path scope already exists');
+        }
+        this._customContainerScope = path;
+    }
+
+    public EndContainerPathScope(): void
+    {
+        this._customContainerScope = null;
+    }
+
     public RegisterTarget(target: any, 
         onPropertyChange?: (property: string, value: any) => void): void 
     {
@@ -121,6 +137,10 @@ export class ReflectedInspector
             }
             nodePath = nodePath + '/' + property.propertyKey;
             nodePath = nodePath.replace(/^\/+/, '');
+            if (this._customContainerScope)
+            {
+                nodePath = this._customContainerScope + '/' + nodePath;
+            }
             nodePathToProperties.set(nodePath, property);
         }
 

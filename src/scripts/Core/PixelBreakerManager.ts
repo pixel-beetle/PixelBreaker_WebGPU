@@ -52,87 +52,82 @@ export class ParticleCountReadbackBuffer
                 bindingParams: { label: "Static", readonly: true, format: (value: number) => { return value.toFixed(); } } })
     public staticParticleCount: number = 0;
 
-    @UIBinding({category: "Particle Count", 
-                bindingParams: { label: "Convert Candidate", readonly: true, format: (value: number) => { return value.toFixed(); } } })
-    public convertCandidateParticleCount: number = 0;
 
     public Update()
     {
         this.dynamicParticleCount = this.buffer[0];
         this.staticParticleCount = this.buffer[1];
-        this.convertCandidateParticleCount = this.buffer[2];
     }
 }
 
 
 export class PixelBreakerParams
 {
-
-    @UIBinding({category: "Static Particle", bindingParams: { label: "Spawn Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
+    @UIBinding({containerPath: "#T/%Spawn/@Static Particle", bindingParams: { label: "Spawn Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
     public staticParticleSpawnRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.2, 0.3);
-    @UIBinding({category: "Static Particle", bindingParams: { label: "Spawn Rect Max", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
+    @UIBinding({containerPath: "#T/%Spawn/@Static Particle", bindingParams: { label: "Spawn Rect Max", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
     public staticParticleSpawnRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.8, 1.0);
     
-    @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Initial Count", min:0, format: (value: number) => { return value.toFixed(); } } })
+    @UIBinding({containerPath: "#T/%Spawn/@Dynamic Particle", bindingParams: { label: "Spawn Count", min:0, format: (value: number) => { return value.toFixed(); } } })
     public dynamicParticleInitialCount: number = 10000;
 
-    @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Initial Speed", min:0 } })
+    @UIBinding({containerPath: "#T/%Spawn/@Dynamic Particle", bindingParams: { label: "Spawn Speed", min:0 } })
     public dynamicParticleInitialSpeed : number = 500;
 
-    @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Max Speed", min:0 } })
-    public dynamicParticleMaxSpeed: number = 500;
-
-    @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Use Fixed Speed", min:0 } })
-    public dynamicParticleUseFixedSpeed : boolean = false;
-
-    @UIBinding({category: "Dynamic Particle", bindingParams: { label: "Fixed Speed", min:0 } })
-    public dynamicParticleFixedSpeed : number = 500;
-
-    @UIBinding({category: "Reflection Board", bindingParams: { label: "Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
-    public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.12);
-    @UIBinding({category: "Reflection Board", bindingParams: { label: "Rect Max", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
-    public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.14);
-
-    @UIBinding({category: "Reflection Board", bindingParams: { label: "Color", color : { type: 'float' } } } )
-    public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.2, 0.2, 0.8, 1.0);
-
-    @UIBinding({category: "SDF Force", bindingParams: { label: "Enable", type: 'boolean' } })
-    public useDistanceFieldForce : boolean = true;
-    @UIBinding({category: "SDF Force", bindingParams: { label: "Collision Strength" } })
-    public distanceFieldCollisionStrength : number = 100;
-    @UIBinding({category: "SDF Force", bindingParams: { label: "Swirl Strength" } })
-    public distanceFieldSwirlStrength : number = 10;
-
-    @UIBinding({category: "Force By Color", bindingParams: { label: "Force Strength" } })
-    public forceByColorStrength : number = 5.0;
-
-    @UIBinding({category: "Force By Color", bindingParams: { label: "Change Speed", min: 0, max: 5, step: 0.01 } })
-    public forceByColorChangeSpeed: number = 1.5;
-
-    @UIBinding({category: "Dynamic Particle Render", bindingParams: { label: "Render Size", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
-    public dynamicParticleSize: number = 4.0;
-
-    @UIBinding({category: "Dynamic Particle Render", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 0.5, step: 0.001 } })
-    public trailFadeRate : number = 0.05;
-
-    @UIGradient({category: "Particle Color", label: "Particle Spawn Color" })
+    @UIGradient({containerPath: "#T/%Spawn/@Color", label: "Particle Spawn Color" })
     public particleSpawnColorGradient: Gradient = GradientEx.HSV(64);
 
-    @UIGradient({category: "Particle Color", label: "Particle Color By Speed" })
-    public particleColorBySpeedGradient: Gradient = GradientEx.HSV(64);
+    @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Max Speed", min:0 } })
+    public dynamicParticleMaxSpeed: number = 500;
 
-    @UIBinding({category: "Particle Color", bindingParams: { label: "Color By Speed Remap Range" } })
-    public colorBySpeedRamapRange: BABYLON.Vector2 = new BABYLON.Vector2(0, 500);
+    @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Use Fixed Speed", min:0 } })
+    public dynamicParticleUseFixedSpeed : boolean = false;
 
-    @UIBinding({category: "Particle Color", bindingParams: { label: "Color By Speed Factor", min: 0, max: 1, step: 0.01 } })
-    public colorBySpeedFactor: number = 0.0;
+    @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Fixed Speed", min:0 } })
+    public dynamicParticleFixedSpeed : number = 500;
 
-    @UIBinding({category: "Particle Color", bindingParams: { label: "Sync Reflection Board when hit", min: 0, max: 1, step: 0.01 } })
+
+    @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Enable", type: 'boolean' } })
+    public useDistanceFieldForce : boolean = true;
+    @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Collision Strength" } })
+    public distanceFieldCollisionStrength : number = 100;
+    @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Swirl Strength" } })
+    public distanceFieldSwirlStrength : number = 10;
+
+    @UIBinding({containerPath: "#T/%Update/@Force By Color", bindingParams: { label: "Force Strength" } })
+    public forceByColorStrength : number = 5.0;
+
+    @UIBinding({containerPath: "#T/%Update/@Force By Color", bindingParams: { label: "Change Speed", min: 0, max: 5, step: 0.01 } })
+    public forceByColorChangeSpeed: number = 1.5;
+
+    @UIBinding({containerPath: "#T/%Update/@Color Change when Collide With", bindingParams: { label: "Reflection Board", min: 0, max: 1, step: 0.01 } })
     public colorChangeWhenCollideWithReflectionBoard : number = 0;
     
-    @UIBinding({category: "Particle Color", bindingParams: { label: "Sync Static Particle when hit", min: 0, max: 1, step: 0.01 } })
+    @UIBinding({containerPath: "#T/%Update/@Color Change when Collide With", bindingParams: { label: "Static Particles", min: 0, max: 1, step: 0.01 } })
     public colorChangeWhenCollideWithStaticParticle : number = 0;
 
+    @UIBinding({containerPath: "#T/%Render", bindingParams: { label: "Render Size", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
+    public dynamicParticleSize: number = 4.0;
+
+    @UIBinding({containerPath: "#T/%Render", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 0.5, step: 0.001 } })
+    public trailFadeRate : number = 0.05;
+
+
+    @UIGradient({containerPath: "#T/%Render/@Speed Visualize", label: "Color By Speed Gradient" })
+    public particleColorBySpeedGradient: Gradient = GradientEx.HSV(64);
+
+    @UIBinding({containerPath: "#T/%Render/@Speed Visualize", bindingParams: { label: "Color By Speed Remap Range" } })
+    public colorBySpeedRamapRange: BABYLON.Vector2 = new BABYLON.Vector2(0, 500);
+
+    @UIBinding({containerPath: "#T/%Render/@Speed Visualize", bindingParams: { label: "Color By Speed Factor", min: 0, max: 1, step: 0.01 } })
+    public colorBySpeedFactor: number = 0.0;
+
+    @UIBinding({containerPath: "#T/%Board", bindingParams: { label: "Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
+    public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.12);
+    @UIBinding({containerPath: "#T/%Board", bindingParams: { label: "Rect Max", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
+    public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.14);
+    @UIBinding({containerPath: "#T/%Board", bindingParams: { label: "Color", color : { type: 'float' } } } )
+    public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.2, 0.2, 0.8, 1.0);
 
 
     public HandlePropertyChange(property: string, value: any, pixelBreakerManager: PixelBreakerManager)
