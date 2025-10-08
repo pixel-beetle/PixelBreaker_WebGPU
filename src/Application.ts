@@ -40,7 +40,7 @@ export class Application
     private engine: BABYLON.Engine;
     private sceneManager!: SceneManager;
     private videoManager!: VideoManager;
-    private reflectionUIManager!: ReflectedInspector;
+    private inspector!: ReflectedInspector;
     private jumpFloodingSDFGenerator!: JumpFloodingSDFGenerator;
     private pixelBreakerManager!: PixelBreakerManager;
 
@@ -55,7 +55,7 @@ export class Application
 
     private InitializeManagers(): void 
     {
-        this.reflectionUIManager = new ReflectedInspector({
+        this.inspector = new ReflectedInspector({
             title: 'Control Panel',
             position: 'center',
             expanded: true,
@@ -74,7 +74,7 @@ export class Application
 
     private RegisterUITargets(): void
     {
-        this.reflectionUIManager.RegisterTarget('Application', this, (property: string, value: any) => {
+        this.inspector.RegisterTarget(this, (property: string, value: any) => {
             switch (property) {
                 case 'renderTargetWidth':
                     this.renderTargetWidth = value;
@@ -85,7 +85,32 @@ export class Application
             }
         });
 
-        (this.reflectionUIManager.uiBuilder.folders.get('Application')!.addBlade({
+        this.inspector.RegisterTarget(this.videoManager, (property: string, value: any) => {
+            this.videoManager.handlePropertyChange(property, value);
+        });
+
+        this.inspector.RegisterTarget(this.jumpFloodingSDFGenerator.params, (property: string, value: any) => {
+            switch (property) {
+                case 'inputValueThreshold':
+                    this.jumpFloodingSDFGenerator.params.inputValueThreshold = value;
+                    break;
+                case 'inputInvert':
+                    this.jumpFloodingSDFGenerator.params.inputInvert = value;
+            }
+        
+        });
+
+        this.inspector.RegisterTarget(this.pixelBreakerManager.particleCountReadback, (property: string, value: any) => {
+            
+        });
+
+        this.inspector.RegisterTarget(this.pixelBreakerManager.params, (property: string, value: any) => {
+            this.pixelBreakerManager.params.HandlePropertyChange(property, value, this.pixelBreakerManager);
+        });
+    
+        this.inspector.BuildUIComponents();
+
+        (this.inspector.uiBuilder.tree!.GetFolder('@Application')!.addBlade({
             view: 'buttongrid',
             size: [2, 1],
             cells: (x: number, y: number) => ({
@@ -107,26 +132,6 @@ export class Application
                     this.pixelBreakerManager.Reset();
                 }
           });
-
-        this.reflectionUIManager.RegisterTarget('video', this.videoManager, (property: string, value: any) => {
-            this.videoManager.handlePropertyChange(property, value);
-        });
-        this.reflectionUIManager.RegisterTarget('jumpFloodingSDFGenerator', this.jumpFloodingSDFGenerator.params, (property: string, value: any) => {
-            switch (property) {
-                case 'inputValueThreshold':
-                    this.jumpFloodingSDFGenerator.params.inputValueThreshold = value;
-                    break;
-                case 'inputInvert':
-                    this.jumpFloodingSDFGenerator.params.inputInvert = value;
-            }
-        
-        });
-        this.reflectionUIManager.RegisterTarget('particleCount', this.pixelBreakerManager.particleCountReadback, (property: string, value: any) => {
-            
-        });
-        this.reflectionUIManager.RegisterTarget('pixelBreaker', this.pixelBreakerManager.params, (property: string, value: any) => {
-            this.pixelBreakerManager.params.HandlePropertyChange(property, value, this.pixelBreakerManager);
-        });
     }
 
     SetUpBabylonDebugLayer(debugOn: boolean = true): void 
@@ -171,7 +176,7 @@ export class Application
     // 清理资源
     dispose(): void 
     {
-        this.reflectionUIManager.dispose();
+        this.inspector.dispose();
         this.videoManager.dispose();
         this.sceneManager.dispose();
         this.engine.dispose();

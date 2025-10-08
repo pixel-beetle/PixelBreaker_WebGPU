@@ -13,7 +13,7 @@ export class ReflectedInspector
     {
         return this._uiBuilder;
     }
-    private _targets: Map<string, any> = new Map();
+    private _targets: Set<any> = new Set();
     private _refreshTimer?: number;
     private _options: ReflectedInspectorOptions;
 
@@ -42,19 +42,20 @@ export class ReflectedInspector
     }
 
 
-    public RegisterTarget(name: string, target: any, onPropertyChange?: (property: string, value: any) => void): void 
+    public RegisterTarget(target: any, 
+        onPropertyChange?: (property: string, value: any) => void): void 
     {
-        this._targets.set(name, target);
+        this._targets.add(target);
         
         const properties = GetUIProperties(target.constructor.prototype);
         
         if (properties.length === 0) 
         {
-            console.warn(`No UI properties found for target: ${name}`);
+            console.warn(`No UI properties found for target: ${target.constructor.name}`);
             return;
         }
 
-        this._uiBuilder.BuildUI(target, properties, { onPropertyChange });
+        this._uiBuilder.RegisterTarget(target, properties, { onPropertyChange });
 
         if (this._options.autoRefresh && !this._refreshTimer) 
         {
@@ -63,13 +64,18 @@ export class ReflectedInspector
     }
 
 
-    public UnregisterTarget(name: string): void 
+    public UnregisterTarget(target: any): void 
     {
-        this._targets.delete(name);
+        this._targets.delete(target);
         if (this._targets.size === 0 && this._refreshTimer) 
         {
             this.StopAutoRefresh();
         }
+    }
+
+    public BuildUIComponents(): void 
+    {
+        this._uiBuilder.BuildUIComponents();
     }
 
     public Refresh(): void 

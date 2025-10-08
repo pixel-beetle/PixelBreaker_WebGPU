@@ -3,8 +3,8 @@ import { GradientBladeParams } from "tweakpane-plugin-gradient";
 
 export interface UIPropertyOptions 
 {
-    tab?: string;
     category?: string;
+    containerPath?: string;
 }
 
 export interface BindingOptions extends UIPropertyOptions 
