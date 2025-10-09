@@ -1,6 +1,6 @@
 
 
-import { Gradient } from 'tweakpane-plugin-gradient';
+import { Gradient, GradientPoint } from 'tweakpane-plugin-gradient';
 import * as BABYLON from 'babylonjs';
 
 export class GradientUtils
@@ -57,6 +57,62 @@ export class GradientUtils
             points: points,
         });
         return gradient;
+    }
+
+    public static TryParseFromString(string: string) : Gradient | null
+    {
+        let hexStrings: string[] = [];
+        let points:{time: number, value: {r: number, g: number, b: number, a: number}}[] = [];
+
+        // Pattern A: any number of #ffffff, separated by - , ; or white space
+        const patternA = /\b(#?[0-9a-fA-F]{6})\b/g;
+        const matchA = string.matchAll(patternA);
+        if(matchA)
+        {
+            for(const match of matchA)
+            {
+                let hexString = match[1];
+                if(!hexString.startsWith('#'))
+                {
+                    hexString = '#' + hexString;
+                }
+                hexStrings.push(hexString);
+            }
+        }
+
+        // Pattern B: color hunt URL
+        const patternB = /https?:\/\/colorhunt\.co\/palette\/(?<paletteId>[0-9a-zA-Z-]+)/;
+        const matchB = string.match(patternB);
+        if(matchB)
+        {
+            const paletteId = matchB.groups?.paletteId;
+            if(paletteId && paletteId.length % 6 === 0)
+            {
+                for(let i = 0; i < paletteId.length; i+=6)
+                {
+                    const hexString = paletteId.slice(i, i + 6);
+                    hexStrings.push('#' + hexString);
+                }
+            }
+        }
+
+
+
+
+
+        if(hexStrings.length === 0)
+        {
+            return null;
+        }
+
+        const timeStep = 1.0 / (hexStrings.length);
+        const startTime = timeStep / 2;
+        for(let i = 0; i < hexStrings.length; i++)
+        {
+            const color = BABYLON.Color3.FromHexString(hexStrings[i]);
+            points.push({ time: startTime + i * timeStep, value: { r: color.r * 255, g: color.g * 255, b: color.b * 255, a: 1 } });
+        }
+        return new Gradient({ points: points });
     }
 }
 

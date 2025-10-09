@@ -110,7 +110,7 @@ export class Application
         });
         this._inspector.RegisterTarget(this, (property: string, value: any) => {
             switch (property) {
-                case 'renderTargetResolutionOption':
+                case '_renderTargetResolutionOption':
                     this._renderTargetWidth = kRenderTargetResolutionOptions[value][0];
                     this._renderTargetHeight = kRenderTargetResolutionOptions[value][1];
                     break;

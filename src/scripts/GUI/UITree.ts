@@ -2,6 +2,7 @@ import { BindingParams, FolderApi, TabApi, TabPageApi, Pane } from 'tweakpane';
 import { UIPropertyMetadata, GetUIProperties, ButtonOptions, BindingOptions, GradientOptions } from './UIProperty';
 import { Gradient, GradientBladeApi, GradientBladeParams } from 'tweakpane-plugin-gradient';
 import { BindingApi, ButtonApi } from '@tweakpane/core';
+import { GradientUtils } from '../GfxUtils/ColorGradient';
 
 
 export const UI_PATH_PREFIX_TAB = '#';
@@ -323,12 +324,42 @@ export class UILeafNode extends UINode
                     {
                         gradientParams.initialPoints = target[propertyKey].points;
                     }
-                    const gradient = container.addBlade(gradientParams) as GradientBladeApi;
-                    gradient.on('change', (ev: any) => {
+                    const gradientUI = container.addBlade(gradientParams) as GradientBladeApi;
+                    gradientUI.on('change', (ev: any) => {
                         if (onPropertyChange) {
                             onPropertyChange(propertyKey, ev.value);
                         }
                     });
+
+                    const onClickGradientPasteButton = (ev: any) => 
+                    {
+                            navigator.clipboard.readText().then(
+                            (text) => 
+                            {
+                                const gradient = GradientUtils.TryParseFromString(text);
+                                if (gradient && onPropertyChange) {
+                                    gradientUI.value = gradient;
+                                    onPropertyChange(propertyKey, gradient);
+                                }
+                            })
+                            .catch((error) => {
+                                console.error('Failed to read clipboard:', error);
+                            });
+                    }
+
+                    const gradientPasteButtonContainer = container.addFolder({
+                        title: 'Paste Gradient from Clipboard',
+                        expanded: false,
+                    });
+                    const gradientPasteButtonA = gradientPasteButtonContainer.addButton({
+                        title: 'colorhunt.co URL',
+                    }) as any;
+                    gradientPasteButtonA.on('click', onClickGradientPasteButton);
+                    const gradientPasteButtonB = gradientPasteButtonContainer.addButton({
+                        title: 'colors.co URL',
+                    }) as any;
+                    gradientPasteButtonB.on('click', onClickGradientPasteButton);
+                
                     break;
                 default:
                     const bindingOptions = options as BindingOptions;
