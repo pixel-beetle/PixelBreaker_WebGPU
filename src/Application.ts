@@ -80,12 +80,16 @@ export class Application
 
         this.RegisterUITargets();
 
+        this._inspector.pane.addBlade({
+            view: 'separator',
+        });
+
         this._videoManager.SetupVideo('./BadApple_Video.mp4');
-        const videoParentNode = this._inspector.tree?.GetTabPage(kTabPagePath_General)!;
-        videoParentNode.element.appendChild(this._videoManager.videoElement!);
+        const videoParentNode = this._inspector.pane.element;
+        videoParentNode.appendChild(this._videoManager.videoElement!);
 
         this._controlHintElement = this.CreateControlHintElement();
-        videoParentNode.element.appendChild(this._controlHintElement);
+        videoParentNode.appendChild(this._controlHintElement);
     }
 
     private RegisterUITargets(): void
