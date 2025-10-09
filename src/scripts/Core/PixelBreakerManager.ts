@@ -380,8 +380,8 @@ export class PixelBreakerManager
 
             if (this._particleMemoryBuffer)
                 this._particleMemoryBuffer.Release();
-            // Float2 Position, Float2 Velocity, UInt Color
-            const PARTICLE_STATE_SIZE = 5;
+            // UInt Position, UInt Velocity, UInt Color
+            const PARTICLE_STATE_SIZE = 3;
             this._particleMemoryBuffer = new DoubleBufferedStorageBuffer(
                 this._engine as BABYLON.WebGPUEngine,
                 TOTAL_PARTICLE_CAPACITY * PARTICLE_STATE_SIZE,

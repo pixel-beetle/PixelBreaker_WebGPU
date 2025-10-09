@@ -1,3 +1,43 @@
+const kPositionCoordMin = -8192.0;
+const kPositionCoordMax = 8192.0;
+const kSpeedMin = -8192.0;
+const kSpeedMax = 8192.0;
+
+fn PackParticlePosition(positionCoord: vec2<f32>) -> u32
+{
+    // 16 bit each
+    let quantizedX01 = (positionCoord.x - kPositionCoordMin) / (kPositionCoordMax - kPositionCoordMin);
+    let quantizedY01 = (positionCoord.y - kPositionCoordMin) / (kPositionCoordMax - kPositionCoordMin);
+    let quantizedX = u32(quantizedX01 * 65535.0);
+    let quantizedY = u32(quantizedY01 * 65535.0);
+    return (quantizedX << 16) | quantizedY;
+}
+
+fn UnpackParticlePosition(packedPosition: u32) -> vec2<f32>
+{
+    let quantizedX = (packedPosition >> 16) & 0xFFFFu;
+    let quantizedY = packedPosition & 0xFFFFu;
+    return vec2<f32>(kPositionCoordMin + f32(quantizedX) * (kPositionCoordMax - kPositionCoordMin) / 65535.0, 
+                    kPositionCoordMin + f32(quantizedY) * (kPositionCoordMax - kPositionCoordMin) / 65535.0);
+}
+
+fn PackParticleVelocity(velocity: vec2<f32>) -> u32
+{
+    // 16 bit each
+    let quantizedX01 = (velocity.x - kSpeedMin) / (kSpeedMax - kSpeedMin);
+    let quantizedY01 = (velocity.y - kSpeedMin) / (kSpeedMax - kSpeedMin);
+    let quantizedX = u32(quantizedX01 * 65535.0);
+    let quantizedY = u32(quantizedY01 * 65535.0);
+    return (quantizedX << 16) | quantizedY;
+}
+
+fn UnpackParticleVelocity(packedVelocity: u32) -> vec2<f32>
+{
+    let quantizedX = (packedVelocity >> 16) & 0xFFFFu;
+    let quantizedY = packedVelocity & 0xFFFFu;
+    return vec2<f32>(kSpeedMin + f32(quantizedX) * (kSpeedMax - kSpeedMin) / 65535.0, 
+                    kSpeedMin + f32(quantizedY) * (kSpeedMax - kSpeedMin) / 65535.0);
+}
 
 fn Hash(input: u32) -> u32 
 {
@@ -53,8 +93,8 @@ fn UnpackColor(packed: u32) -> vec4<f32>
 
 struct PackedParticleState
 {
-    packedPosition: vec2<f32>,
-    packedVelocity: vec2<f32>,
+    packedPosition: u32,
+    packedVelocity: u32,
     packedColor: u32
 }
 
@@ -66,7 +106,7 @@ struct ParticleState
 }
 
 
-const PACKED_PARTICLE_STATE_SIZE = 5;
+const PACKED_PARTICLE_STATE_SIZE = 3;
 
 
 struct Uniforms
@@ -173,8 +213,8 @@ fn IncrementStaticParticleCount() -> u32
 fn UnpackParticleState(packedParticleState: PackedParticleState) -> ParticleState
 {
     return ParticleState(
-        packedParticleState.packedPosition,
-        packedParticleState.packedVelocity,
+        UnpackParticlePosition(packedParticleState.packedPosition),
+        UnpackParticleVelocity(packedParticleState.packedVelocity),
         UnpackColor(packedParticleState.packedColor)
     );
 }
@@ -182,8 +222,8 @@ fn UnpackParticleState(packedParticleState: PackedParticleState) -> ParticleStat
 fn PackParticleState(particleState: ParticleState) -> PackedParticleState
 {
     return PackedParticleState(
-        particleState.position,
-        particleState.velocity,
+        PackParticlePosition(particleState.position),
+        PackParticleVelocity(particleState.velocity),
         PackColor(particleState.color)
     );
 }
@@ -191,22 +231,18 @@ fn PackParticleState(particleState: ParticleState) -> PackedParticleState
 fn ReadPrevParticleState(id: u32) -> ParticleState
 {
     var packedParticleState = PackedParticleState();
-    packedParticleState.packedPosition.x = bitcast<f32>(_ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE]);
-    packedParticleState.packedPosition.y = bitcast<f32>(_ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE + 1]);
-    packedParticleState.packedVelocity.x = bitcast<f32>(_ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE + 2]);
-    packedParticleState.packedVelocity.y = bitcast<f32>(_ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE + 3]);
-    packedParticleState.packedColor =                   _ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE + 4];
+    packedParticleState.packedPosition = _ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE];
+    packedParticleState.packedVelocity = _ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE + 1];
+    packedParticleState.packedColor    = _ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE + 2];
     return UnpackParticleState(packedParticleState);
 }
 
 fn WriteParticleState(id: u32, particleState: ParticleState)
 {
     let packedParticleState = PackParticleState(particleState);
-    _ParticleMemoryBuffer_RW[id * PACKED_PARTICLE_STATE_SIZE]     = bitcast<u32>(packedParticleState.packedPosition.x);
-    _ParticleMemoryBuffer_RW[id * PACKED_PARTICLE_STATE_SIZE + 1] = bitcast<u32>(packedParticleState.packedPosition.y);
-    _ParticleMemoryBuffer_RW[id * PACKED_PARTICLE_STATE_SIZE + 2] = bitcast<u32>(packedParticleState.packedVelocity.x);
-    _ParticleMemoryBuffer_RW[id * PACKED_PARTICLE_STATE_SIZE + 3] = bitcast<u32>(packedParticleState.packedVelocity.y);
-    _ParticleMemoryBuffer_RW[id * PACKED_PARTICLE_STATE_SIZE + 4] = packedParticleState.packedColor;
+    _ParticleMemoryBuffer_RW[id * PACKED_PARTICLE_STATE_SIZE]     = packedParticleState.packedPosition;
+    _ParticleMemoryBuffer_RW[id * PACKED_PARTICLE_STATE_SIZE + 1] = packedParticleState.packedVelocity;
+    _ParticleMemoryBuffer_RW[id * PACKED_PARTICLE_STATE_SIZE + 2] = packedParticleState.packedColor;
 }
 
 fn WriteParticleActivateState(id: u32, particleActivateState: u32)
