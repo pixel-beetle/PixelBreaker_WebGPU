@@ -37,7 +37,8 @@ fn main(input : FragmentInputs) -> FragmentOutputs
                                 && pixelCoord.x < u32(_Uniforms._ReflectionBoardRectMinMax.z) 
                                 && pixelCoord.y < u32(_Uniforms._ReflectionBoardRectMinMax.w);
 
-    color = select(color, _Uniforms._ReflectionBoardColor, isInsideReflectionBoard);
+    let reflectionBoardColorFactor = select(0.0, _Uniforms._ReflectionBoardColor.a, isInsideReflectionBoard);
+    color = mix(color, _Uniforms._ReflectionBoardColor, reflectionBoardColorFactor);
     color = select(color, vec4<f32>(1.0, 0.0, 0.0, 1.0), isOutsideTexture);
     color.a = 1.0;
     fragmentOutputs.color = color;

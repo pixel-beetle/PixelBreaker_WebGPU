@@ -62,13 +62,13 @@ export class ParticleCountReadbackBuffer
 
 export class PixelBreakerBoardParams
 {
-    @UIBinding({bindingParams: { label: "Move Speed", min: 0, max: 0.2, step: 0.001 } })
-    public reflectionBoardMoveSpeed: number = 0.05;
+    @UIBinding({bindingParams: { label: "Move Speed", min: 0, max: 10, step: 0.001 } })
+    public reflectionBoardMoveSpeed: number = 2;
     @UIBinding({bindingParams: { label: "Y Position", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
     public reflectionBoardPosY01: number = 0.1;
     @UIBinding({bindingParams: { label: "Size", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
     public reflectionBoardSize01 : BABYLON.Vector2 = new BABYLON.Vector2(0.2, 0.0);
-    @UIBinding({bindingParams: { label: "Color", color : { type: 'float' } } } )
+    @UIBinding({bindingParams: { label: "Color", color : { type: 'float', alpha: true } } } )
     public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.95, 0.27, 0.74, 1.0);
 
     private _reflectionBoardPosX01 : number = 0.5;
@@ -76,9 +76,12 @@ export class PixelBreakerBoardParams
     public reflectionBoardRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.4, 0.1);
     public reflectionBoardRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.6, 0.1);
 
+    public scene: BABYLON.Scene | null = null;
+
     public OnGetInput(direction: number = 0)
     {
-        this._reflectionBoardPosX01 += direction * this.reflectionBoardMoveSpeed;
+        const deltaTimeSeconds = this.scene!.deltaTime * 0.001;
+        this._reflectionBoardPosX01 += direction * this.reflectionBoardMoveSpeed * deltaTimeSeconds;
         this._reflectionBoardPosX01 = Math.max(0, Math.min(1, this._reflectionBoardPosX01));
         this.UpdateReflectionBoardRect();
     }
@@ -330,6 +333,7 @@ export class PixelBreakerManager
     {
         this._scene = scene;
         this._engine = engine;
+        this.boardParams.scene = scene;
         this.boardParams.UpdateReflectionBoardRect();
 
         const renderTargetSizeChanged = this._renderTargetSizeInfo.IsDifferent(renderTargetSize);

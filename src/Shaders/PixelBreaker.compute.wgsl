@@ -97,6 +97,9 @@ struct Uniforms
 
     _TrailFadeRate: f32,
     _SoftwareRasterizeSortingParams: vec4<f32>,
+
+    _MousePosition: vec2<f32>,
+    _MouseInteractionParams: vec4<f32>, // x: radius, y: radial strength, z: swirl strength, w: falloff exponent
 }
 
 @group(0) @binding(0) var<uniform> _Uniforms: Uniforms;
@@ -470,9 +473,34 @@ fn IsParticleCollidingSceneBounds(position: vec2<f32>, velocity: vec2<f32>,
 }
 
 
+struct RayIntersectsAABB2DResult
+{
+    intersects: bool,
+    tMin: f32,
+    tMax: f32,
+}
+
+fn IsRayIntersectsAABB2D(rayOrigin: vec2f, rayDir: vec2f, aabbMin: vec2f, aabbMax: vec2f) -> RayIntersectsAABB2DResult 
+{
+    let invRayDir = 1.0 / rayDir;
+    
+    let tMin = (aabbMin - rayOrigin) * invRayDir;
+    let tMax = (aabbMax - rayOrigin) * invRayDir;
+    
+    let t1 = min(tMin, tMax);
+    let t2 = max(tMin, tMax);
+    
+    let tNear = max(t1.x, t1.y);
+    let tFar = min(t2.x, t2.y);
+    
+    let hit = select(0.0, 1.0, tNear <= tFar && tFar >= 0.0);
+    
+    return RayIntersectsAABB2DResult(hit > 0.5, tNear, tFar);
+}
 
 fn IsParticleCollidingReflectionBoard(position: vec2<f32>, velocity: vec2<f32>, 
-    reflectedVelocity: ptr<function, vec2<f32>>) -> bool
+    reflectedVelocity: ptr<function, vec2<f32>>, 
+    correctedPosition: ptr<function, vec2<f32>>) -> bool
 {
     *reflectedVelocity = velocity;
     if (!IsReflectionBoardCollisionEnabled())
@@ -482,34 +510,42 @@ fn IsParticleCollidingReflectionBoard(position: vec2<f32>, velocity: vec2<f32>,
     
     let reflectionBoardMin = _Uniforms._ReflectionBoardRectMinMax.xy;
     let reflectionBoardMax = _Uniforms._ReflectionBoardRectMinMax.zw;
-    let reflectionBoardExtents = reflectionBoardMax - reflectionBoardMin;
-    let yTolerance = min(2.0, abs(reflectionBoardExtents.y * 0.3));
-    // top
-    if ( abs(position.y - reflectionBoardMax.y) < yTolerance
-        && velocity.y < 0.0 && position.x >= reflectionBoardMin.x && position.x <= reflectionBoardMax.x )
+
+    let rayDir = normalize(velocity);
+    let rayIntersectsResult = IsRayIntersectsAABB2D(position, rayDir, 
+                                reflectionBoardMin, reflectionBoardMax);
+
+    const kTolerance = 1.0;
+    if (rayIntersectsResult.intersects && rayIntersectsResult.tMin < 1.0)
     {
-        *reflectedVelocity = reflect(velocity, vec2<f32>(0.0, 1.0));
-        return true;
-    }
-    // bottom
-    if ( abs(position.y - reflectionBoardMin.y) < yTolerance
-        && velocity.y > 0.0 && position.x >= reflectionBoardMin.x && position.x <= reflectionBoardMax.x )
-    {
-        *reflectedVelocity = reflect(velocity, vec2<f32>(0.0, -1.0));
-        return true;
-    }
-    // left
-    if ( abs(position.x - reflectionBoardMin.x) < yTolerance
-        && velocity.x > 0.0 && position.y >= reflectionBoardMin.y && position.y <= reflectionBoardMax.y )
-    {
-        *reflectedVelocity = reflect(velocity, vec2<f32>(-1.0, 0.0));
-        return true;
-    }
-    // right
-    if ( abs(position.x - reflectionBoardMax.x) < yTolerance
-        && velocity.x < 0.0 && position.y >= reflectionBoardMin.y && position.y <= reflectionBoardMax.y )
-    {
-        *reflectedVelocity = reflect(velocity, vec2<f32>(1.0, 0.0));
+        let hitPoint = position + rayDir * rayIntersectsResult.tMin;
+        var hitNormal = vec2<f32>(0.0, 1.0);
+        // left 
+        if (abs(hitPoint.x - reflectionBoardMin.x) < kTolerance
+            && velocity.x > 0.0)
+        {
+            hitNormal = vec2<f32>(-1.0, 0.0);
+        }
+        // right
+        else if (abs(hitPoint.x - reflectionBoardMax.x) < kTolerance
+            && velocity.x < 0.0)
+        {
+            hitNormal = vec2<f32>(1.0, 0.0);
+        }
+        // bottom
+        else if (abs(hitPoint.y - reflectionBoardMin.y) < kTolerance
+            && velocity.y > 0.0)
+        {
+            hitNormal = vec2<f32>(0.0, -1.0);
+        }
+        // top
+        else if (abs(hitPoint.y - reflectionBoardMax.y) < kTolerance
+            && velocity.y < 0.0)
+        {
+            hitNormal = vec2<f32>(0.0, 1.0);
+        }
+        *reflectedVelocity = reflect(velocity, hitNormal);
+        *correctedPosition = hitPoint + hitNormal * kTolerance;
         return true;
     }
     return false;
@@ -678,6 +714,30 @@ fn ApplyParticleMotion_ForceByColor(state : ptr<function, ParticleState>, dt: f3
     (*state).velocity += forceDir * forceStrength * dt;
 }
 
+fn ApplyParticleMotion_MouseInteraction(state : ptr<function, ParticleState>, dt: f32)
+{
+    let mousePosition = _Uniforms._MousePosition;
+    let mouseInteractionParams = _Uniforms._MouseInteractionParams;
+    let radius = mouseInteractionParams.x;
+    let radialStrength = mouseInteractionParams.y;
+    let swirlStrength = mouseInteractionParams.z;
+    let falloffExponent = mouseInteractionParams.w;
+
+    let distance = length(state.position - mousePosition);
+    var distanceRemap = distance / radius;
+    distanceRemap = saturate(distanceRemap);
+    let distanceRemapPow = pow(distanceRemap, falloffExponent);
+    let radialForceStrength = distanceRemapPow * radialStrength;
+    let swirlForceStrength = swirlStrength * (1.0 - distanceRemapPow);
+
+    let radialForceDir = normalize(state.position - mousePosition);
+    let swirlForceDir = rotate_90_ccw(radialForceDir);
+    (*state).velocity += radialForceDir * radialForceStrength * dt;
+    (*state).velocity += swirlForceDir * swirlForceStrength * dt;
+
+}
+
+
 @compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
 fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
 {
@@ -694,6 +754,7 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     var maxSpeed = _Uniforms._DynamicParticleSpeedParams.y;
     ApplyParticleMotion_DistanceField(&particleState, deltaTime, &maxSpeed);
     ApplyParticleMotion_ForceByColor(&particleState, deltaTime);
+    ApplyParticleMotion_MouseInteraction(&particleState, deltaTime);
     var newVelocity = particleState.velocity;
     ClampParticleSpeed(&newVelocity, maxSpeed);
 
@@ -703,9 +764,9 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     var positionAfterCollision = vec2<f32>(0.0, 0.0);
     var velocityAfterCollision = vec2<f32>(0.0, 0.0);
 
-
-    if (IsParticleCollidingReflectionBoard(newPosition, newVelocity, &velocityAfterCollision))
+    if (IsParticleCollidingReflectionBoard(newPosition, newVelocity, &velocityAfterCollision, &positionAfterCollision))
     {
+        newPosition = positionAfterCollision;
         newVelocity = velocityAfterCollision;
         let colorTransitionFactor = _Uniforms._ColorByCollisionParams.x;
         newColor = mix(newColor, _Uniforms._ReflectionBoardColor, colorTransitionFactor);
