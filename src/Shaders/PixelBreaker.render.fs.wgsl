@@ -2,7 +2,9 @@ struct Uniforms
 {
     _RenderTargetTexelSize: vec4<f32>,
     _ReflectionBoardRectMinMax: vec4<f32>,
-    _ReflectionBoardColor: vec4<f32>
+    _ReflectionBoardColor: vec4<f32>,
+    _MousePosition: vec4<f32>, // xy: pos, z:is pressed, w: button
+    _MouseInteractionParams: vec4<f32> // x: radius, y: radial strength, z: swirl strength, w: falloff exponent
 }
 
 var<uniform> _Uniforms: Uniforms;
@@ -17,6 +19,27 @@ fn UnpackColor(packed: u32) -> vec4<f32> {
     let b = f32((packed >> 16) & 255u) / 255.0;
     let a = f32((packed >> 24) & 255u) / 255.0;
     return vec4<f32>(r, g, b, a);
+}
+
+fn DrawMouseInteractionHint(pixelCoord: vec2<u32>, texelSize: vec4<f32>) -> vec4<f32>
+{
+    let circleCenter = _Uniforms._MousePosition.xy;
+    let circleRadius = _Uniforms._MouseInteractionParams.x;
+    let distanceToCenter = length(vec2<f32>(f32(pixelCoord.x), f32(pixelCoord.y)) - circleCenter);
+    let distanceToEdge = abs(distanceToCenter - circleRadius);
+    let circleEdge = 1.0 - smoothstep(1.5, 2.0, distanceToEdge);
+
+    let button = i32(_Uniforms._MousePosition.w);
+    let isButtonPressed = button >= 0;
+    let hasWheelAction = _Uniforms._MousePosition.z > 0.5;
+    let shouldShowHint = isButtonPressed || hasWheelAction;
+
+    let alpha = select(0.0, circleEdge, shouldShowHint);
+    var colorRGB = vec3<f32>(1.0, 1.0, 1.0);
+    let colorByButton = select(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 0.0, 1.0), button == 0);
+    colorRGB = select(colorRGB, colorByButton, isButtonPressed);
+    let color = vec4<f32>(colorRGB, alpha);
+    return color;
 }
 
 @fragment
@@ -40,6 +63,8 @@ fn main(input : FragmentInputs) -> FragmentOutputs
     let reflectionBoardColorFactor = select(0.0, _Uniforms._ReflectionBoardColor.a, isInsideReflectionBoard);
     color = mix(color, _Uniforms._ReflectionBoardColor, reflectionBoardColorFactor);
     color = select(color, vec4<f32>(1.0, 0.0, 0.0, 1.0), isOutsideTexture);
+    let mouseInteractionHintColor = DrawMouseInteractionHint(pixelCoord, texelSize);
+    color = mix(color, mouseInteractionHintColor, mouseInteractionHintColor.a);
     color.a = 1.0;
     fragmentOutputs.color = color;
 }

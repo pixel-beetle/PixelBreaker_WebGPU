@@ -138,7 +138,7 @@ struct Uniforms
     _TrailFadeRate: f32,
     _SoftwareRasterizeSortingParams: vec4<f32>,
 
-    _MousePosition: vec2<f32>,
+    _MousePosition: vec4<f32>, // xy: pos, z:is pressed, w: button
     _MouseInteractionParams: vec4<f32>, // x: radius, y: radial strength, z: swirl strength, w: falloff exponent
 }
 
@@ -752,21 +752,37 @@ fn ApplyParticleMotion_ForceByColor(state : ptr<function, ParticleState>, dt: f3
 
 fn ApplyParticleMotion_MouseInteraction(state : ptr<function, ParticleState>, dt: f32)
 {
-    let mousePosition = _Uniforms._MousePosition;
+    let mousePosition = _Uniforms._MousePosition.xy;
+    
+    let button = i32(_Uniforms._MousePosition.w);
+    let isPressed = button >= 0;
+    if (!isPressed)
+    {
+        return;
+    }
+
+    let forceDirection = select(1.0, -1.0, button == 0);
+
     let mouseInteractionParams = _Uniforms._MouseInteractionParams;
     let radius = mouseInteractionParams.x;
-    let radialStrength = mouseInteractionParams.y;
-    let swirlStrength = mouseInteractionParams.z;
+    let radialStrength = mouseInteractionParams.y * forceDirection * select(0.0, 1.0, button != 1);
+    let swirlStrength = mouseInteractionParams.z * select(0.0, 1.0, button == 1);
     let falloffExponent = mouseInteractionParams.w;
 
     let distance = length(state.position - mousePosition);
+    if (distance > radius)
+    {
+        return;
+    }
     var distanceRemap = distance / radius;
     distanceRemap = saturate(distanceRemap);
     let distanceRemapPow = pow(distanceRemap, falloffExponent);
-    let radialForceStrength = distanceRemapPow * radialStrength;
-    let swirlForceStrength = swirlStrength * (1.0 - distanceRemapPow);
+    let radialForceStrength = distanceRemapPow * radialStrength
+                            * _Uniforms._RenderTargetTexelSize.zw * 0.25;
+    let swirlForceStrength = swirlStrength
+                            * _Uniforms._RenderTargetTexelSize.zw * 0.25;
 
-    let radialForceDir = normalize(state.position - mousePosition);
+    let radialForceDir = normalize(mousePosition - state.position);
     let swirlForceDir = rotate_90_ccw(radialForceDir);
     (*state).velocity += radialForceDir * radialForceStrength * dt;
     (*state).velocity += swirlForceDir * swirlForceStrength * dt;

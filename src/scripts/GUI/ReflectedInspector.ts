@@ -172,7 +172,7 @@ export class ReflectedInspector
 
     public Refresh(): void 
     {
-        
+        this.pane.refresh();
     }
 
     private StartAutoRefresh(): void 

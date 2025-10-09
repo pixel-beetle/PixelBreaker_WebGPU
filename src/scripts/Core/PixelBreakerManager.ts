@@ -184,7 +184,7 @@ export class PixelBreakerParticlesParams
     } , format: (value: number) => { return value.toFixed(); } } })
     public particleBlendMode: number = 0;
     @UIBinding({containerPath: "#T/%Render/@Blend", bindingParams: { label: "Sorting Peak Count", min: 1, max: 10, step: 1, format: (value: number) => { return value.toFixed(); } } })
-    public sortingPeakCount: number = 3;
+    public sortingPeakCount: number = 4;
     @UIBinding({containerPath: "#T/%Render/@Blend", bindingParams: { label: "Sorting Shift Speed", min: 0.00001, max: 0.001, step: 0.00001 } })
     public sortingShiftSpeed: number = 0.0003;
 
@@ -281,11 +281,87 @@ export class PixelBreakerParticlesParams
     }
 }
 
+
+export class PixelBreakerMouseInteractionParams
+{
+    @UIBinding({bindingParams: { label: "Radius", min: 0, max: 1000, step: 0.01 } })
+    public radius: number = 300;
+    
+    @UIBinding({bindingParams: { label: "Radius Mouse Wheel Step", min: 0, max: 100, step: 1 } })
+    public radiusWheelStep : number = 10;
+    
+    @UIBinding({bindingParams: { label: "Strength", min: 0, step: 0.01 } })
+    public strength: number = 200.0;
+    @UIBinding({bindingParams: { label: "Swirl Strength", min: 0, step: 0.01 } })
+    public swirlStrength: number = 200.0;
+    @UIBinding({bindingParams: { label: "Falloff Exponent", min: 0, step: 0.01 } })
+    public falloffExponent: number = 0.5;
+
+    public mousePosition: BABYLON.Vector2 = new BABYLON.Vector2(0, 0);
+    public hasWheelAction : boolean = false;
+    public button : number = -1;
+
+    public UpdateMousePosition(mousePosition: BABYLON.Vector2)
+    {
+        this.mousePosition = mousePosition;
+    }
+
+    public UpdateRadius(wheelDirection: number)
+    {
+        this.radius = this.radius + wheelDirection * this.radiusWheelStep;
+        this.radius = Math.max(this.radius, 0);
+        this.radius = Math.min(this.radius, 1000);
+    }
+
+    public UpdateHasWheelAction(hasAction: boolean)
+    {
+        this.hasWheelAction = hasAction;
+    }
+
+    public UpdateButton(button: number)
+    {
+        this.button = button;
+    }
+
+    public GetMouseStateUniforms(): BABYLON.Vector4
+    {
+        return new BABYLON.Vector4(this.mousePosition.x, this.mousePosition.y, this.hasWheelAction ? 1 : 0, this.button);
+    }
+
+    public GetMouseInteractionParamsUniforms(): BABYLON.Vector4
+    {
+        return new BABYLON.Vector4(this.radius, this.strength, this.swirlStrength, this.falloffExponent);
+    }
+
+    public HandlePropertyChange(property: string, value: any, pixelBreakerManager: PixelBreakerManager)
+    {
+        switch (property) 
+        {
+            case "radius":
+                this.radius = value;
+                break;
+            case "radiusWheelStep":
+                this.radiusWheelStep = value;
+                break;
+            case "strength":
+                this.strength = value;
+                break;
+            case "swirlStrength":
+                this.swirlStrength = value;
+                break;
+            case "falloffExponent":
+                this.falloffExponent = value;
+                break;
+        }
+    }
+}
+
 export class PixelBreakerManager
 {
     // Params
     public params: PixelBreakerParticlesParams = new PixelBreakerParticlesParams();
     public boardParams: PixelBreakerBoardParams = new PixelBreakerBoardParams();
+    public mouseInteractionParams: PixelBreakerMouseInteractionParams = new PixelBreakerMouseInteractionParams();
     public particleCountReadback: ParticleCountReadbackBuffer = new ParticleCountReadbackBuffer();
 
     public particleSpawnColorGradientTexture: GradientTexture | null = null;
@@ -352,6 +428,8 @@ export class PixelBreakerManager
             this._renderUBO.addUniform("_RenderTargetTexelSize", 4);
             this._renderUBO.addUniform("_ReflectionBoardRectMinMax", 4);
             this._renderUBO.addUniform("_ReflectionBoardColor", 4);
+            this._renderUBO.addUniform("_MousePosition", 4);
+            this._renderUBO.addUniform("_MouseInteractionParams", 4);
             this._renderUBO.create();
         }
         
@@ -645,6 +723,12 @@ export class PixelBreakerManager
         const particleColorTint = new BABYLON.Vector4(this.params.particleColorTint.r, this.params.particleColorTint.g, this.params.particleColorTint.b, this.params.particleColorTint.a);
         this._computeUBO.updateVector4("_ParticleColorTint", particleColorTint);
 
+
+        const mouseInteractionParams = this.mouseInteractionParams.GetMouseInteractionParamsUniforms();
+        const mouseState = this.mouseInteractionParams.GetMouseStateUniforms();
+        this._computeUBO.updateVector4("_MousePosition", mouseState);
+        this._computeUBO.updateVector4("_MouseInteractionParams", mouseInteractionParams);
+
         this._computeUBO.update();
     }
 
@@ -664,6 +748,12 @@ export class PixelBreakerManager
         this._renderUBO.updateVector4("_RenderTargetTexelSize", this._renderTargetSizeInfo.texelSize);
         this._renderUBO.updateVector4("_ReflectionBoardRectMinMax", reflectionBoardRectMinMax);
         this._renderUBO.updateVector4("_ReflectionBoardColor", reflectionBoardColor);
+
+        const mouseInteractionParams = this.mouseInteractionParams.GetMouseInteractionParamsUniforms();
+        const mouseState = this.mouseInteractionParams.GetMouseStateUniforms();
+        this._renderUBO.updateVector4("_MousePosition", mouseState);
+        this._renderUBO.updateVector4("_MouseInteractionParams", mouseInteractionParams);
+
         this._renderUBO.update();
     }
 

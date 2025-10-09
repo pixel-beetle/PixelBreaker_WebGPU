@@ -27,27 +27,10 @@ const kRenderTargetResolutionOptions: Record<string, number[]> =
 };
 
 const kTabPagePath_General = "#RootTab/%General";
-const kTabPagePath_Board = "#RootTab/%Board";
+const kTabPagePath_Interaction = "#RootTab/%Interaction";
 const kTabPagePath_Particles = "#RootTab/%Particles";
 const kFolderPath_Debug = kTabPagePath_General + "/@Debug";
 const kFolderPath_Application = kTabPagePath_General + "/@Application";
-
-
-class KeyControlInfo
-{
-    @UIBinding({ category: "Key Control", bindingParams: { label: "Play/Pause", readonly: true } })
-    public applicationPlayPauseKey: string = 'Space';
-    @UIBinding({ category: "Key Control", bindingParams: { label: "Video Play/Pause", readonly: true } })
-    public videoPlayPauseKey: string = 'V';
-    @UIBinding({ category: "Key Control", bindingParams: { label: "Restart Simulation", readonly: true } })
-    public restartSimulationKey: string = 'R';
-    @UIBinding({ category: "Key Control", bindingParams: { label: "Toggle Inspector", readonly: true } })
-    public inspectorToggleKey: string = 'P';
-    @UIBinding({ category: "Key Control", bindingParams: { label: "Reflection Board Move Left", readonly: true } })
-    public reflectionBoardMoveLeft: string = 'A';
-    @UIBinding({ category: "Key Control", bindingParams: { label: "Reflection Board Move Right", readonly: true } })
-    public reflectionBoardMoveRight: string = 'D';
-}
 
 export class Application 
 {
@@ -68,9 +51,9 @@ export class Application
     private _isPaused: boolean = true;
     private _fpsGraph: any = null;
     private _playStateText : any = null;
-    private _keyControlInfo: KeyControlInfo = new KeyControlInfo();
 
     private _posterElement: HTMLElement | null = null;
+    private _controlHintElement: HTMLElement | null = null;
 
     constructor(readonly canvas: HTMLCanvasElement) {
         this._engine = new BABYLON.WebGPUEngine(canvas) as any;
@@ -82,7 +65,7 @@ export class Application
     private InitializeManagers(): void 
     {
         this._inspector = new ReflectedInspector({
-            title: 'Control Panel',
+            title: 'Inspector',
             position: 'center',
             expanded: true,
             autoRefresh: true,
@@ -100,14 +83,14 @@ export class Application
         this._videoManager.SetupVideo('./BadApple_Video.mp4');
         const videoParentNode = this._inspector.tree?.GetTabPage(kTabPagePath_General)!;
         videoParentNode.element.appendChild(this._videoManager.videoElement!);
+
+        this._controlHintElement = this.CreateControlHintElement();
+        videoParentNode.element.appendChild(this._controlHintElement);
     }
 
     private RegisterUITargets(): void
     {
         this._inspector.BeginContainerPathScope(kTabPagePath_General);
-        this._inspector.RegisterTarget(this._keyControlInfo, (property: string, value: any) => {
-
-        });
         this._inspector.RegisterTarget(this, (property: string, value: any) => {
             switch (property) {
                 case '_renderTargetResolutionOption':
@@ -133,9 +116,15 @@ export class Application
         });
         this._inspector.EndContainerPathScope();
 
-        this._inspector.BeginContainerPathScope(kTabPagePath_Board);
+        this._inspector.BeginContainerPathScope(kTabPagePath_Interaction + "/@Reflection Board");
         this._inspector.RegisterTarget(this._pixelBreakerManager.boardParams, (property: string, value: any) => {
             this._pixelBreakerManager.boardParams.HandlePropertyChange(property, value, this._pixelBreakerManager);
+        });
+        this._inspector.EndContainerPathScope();
+
+        this._inspector.BeginContainerPathScope(kTabPagePath_Interaction + "/@Mouse Interaction");
+        this._inspector.RegisterTarget(this._pixelBreakerManager.mouseInteractionParams, (property: string, value: any) => {
+            this._pixelBreakerManager.mouseInteractionParams.HandlePropertyChange(property, value, this._pixelBreakerManager);
         });
         this._inspector.EndContainerPathScope();
 
@@ -282,6 +271,42 @@ export class Application
                 () => { this._pixelBreakerManager.boardParams.OnGetInput(1); }
               )
         );
+
+        // mouse interactions
+        this._sceneManager.scene.onPointerObservable.add((pointerInfo) => {
+            this._pixelBreakerManager.mouseInteractionParams.UpdateHasWheelAction(
+                pointerInfo.type === BABYLON.PointerEventTypes.POINTERWHEEL
+            );
+            switch (pointerInfo.type) {
+                case BABYLON.PointerEventTypes.POINTERMOVE:
+                    // client space to simulation space
+                    const mouseClientPointX = pointerInfo.event.clientX;
+                    const mouseClientPointY = pointerInfo.event.clientY;
+                    const canvasClientSize = new BABYLON.Vector2(this.canvas.clientWidth, this.canvas.clientHeight);
+                    let mousePos01 = new BABYLON.Vector2(mouseClientPointX / canvasClientSize.x, mouseClientPointY / canvasClientSize.y);
+                    mousePos01.y = 1.0 - mousePos01.y;
+                    const simSpaceMousePos = new BABYLON.Vector2(mousePos01.x * this._renderTargetWidth, 
+                                                                mousePos01.y * this._renderTargetHeight);
+                    this._pixelBreakerManager.mouseInteractionParams.UpdateMousePosition(simSpaceMousePos);
+                    break;
+                case BABYLON.PointerEventTypes.POINTERDOWN:
+                    const button = pointerInfo.event.button;
+                    console.log(button);
+                    this._pixelBreakerManager.mouseInteractionParams.UpdateButton(button);
+                    break;
+                case BABYLON.PointerEventTypes.POINTERUP:
+                    this._pixelBreakerManager.mouseInteractionParams.UpdateButton(-1);
+                    break;
+                case BABYLON.PointerEventTypes.POINTERWHEEL:
+                    const wheelInfo = pointerInfo.event as MouseWheelEvent;
+                    const wheelDirection = wheelInfo.deltaY > 0 ? -1 : 1;
+                    this._pixelBreakerManager.mouseInteractionParams.UpdateRadius(wheelDirection);
+                    this._inspector.Refresh();
+                    break;
+                default:
+                    break;
+            }
+        });
     }
 
     private CreateNotSupportedHintElement(): HTMLElement
@@ -311,6 +336,7 @@ export class Application
         containerElement.style.left = '0';
         containerElement.style.width = '100%';
         containerElement.style.height = '100%';
+        containerElement.style.zIndex = '2000';
 
         const coverElement = document.createElement('div');
         coverElement.style.position = 'absolute';
@@ -350,6 +376,41 @@ export class Application
         containerElement.appendChild(coverElement);
         
         return containerElement;
+    }
+
+    private CreateControlHintElement(): HTMLElement
+    {
+        const controlHintElement = document.createElement('div');
+        controlHintElement.style.position = 'relative';
+        controlHintElement.style.top = '0';
+        controlHintElement.style.left = '0';
+        controlHintElement.style.width = 'auto';
+        controlHintElement.style.height = 'auto';
+        controlHintElement.style.backgroundColor = 'rgba(0, 0, 0, 0.75)';
+        controlHintElement.style.display = 'flex';
+        controlHintElement.style.justifyContent = 'center';
+        controlHintElement.style.alignItems = 'center';
+        controlHintElement.style.color = 'white';
+        controlHintElement.style.fontSize = '14px';
+        controlHintElement.style.zIndex = '1000';
+        // control hint content
+        controlHintElement.innerHTML = 
+        `<br>
+        Keyboard<br>
+          [P]      : Toggle UI<br>
+          [Space]  : Play / Pause<br>
+          [V]      : Rlay / Pause Video Only<br>
+          [R]      : Restart<br>
+          [A/D]    : Move Reflection Board<br>
+        <br>
+        <br>
+        Mouse<br>
+          [Left]   : Push<br>
+          [Right]  : Drag<br>
+          [Middle] : Swirl<br>
+          [Wheel]  : Change Radius<br>
+        <br>`
+        return controlHintElement;
     }
 
     async Run(): Promise<void> 
@@ -433,6 +494,11 @@ export class Application
         {
             this._posterElement.remove();
             this._posterElement = null;
+        }
+        if (this._controlHintElement)
+        {
+            this._controlHintElement.remove();
+            this._controlHintElement = null;
         }
     }
 
