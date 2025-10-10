@@ -26,7 +26,7 @@ jobs:
         run: npm run build
 
       - name: Replace assets path
-        uses: jacobtomlinson/gha-find-replace@v0.1.2
+        uses: jacobtomlinson/gha-find-replace@v3
         with:
           find: '/assets'
           replace: '/PixelBreaker_WebGPU/assets'
