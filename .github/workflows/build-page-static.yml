@@ -25,12 +25,18 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Replace assets path
+        uses: jacobtomlinson/gha-find-replace@v0.1.2
+        with:
+          find: '/assets'
+          replace: '/PixelBreaker_WebGPU/assets'
+          include: 'dist/index.html'
+
       - name: Deploy to build branch
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
-          destination_branch: build
           destination_dir: ./docs
-          keep_files: true
-          commit_message: Deploy build to build branch docs directory
+          keep_files: false
+          commit_message: Deploy build to gh-page branch docs directory
