@@ -5,18 +5,6 @@ import { ComputeShaderSet } from '../GfxUtils/ComputeShaderSet';
 import MathUtils from '../MathUtils/MathUtils';
 import { UIBinding } from '../GUI/UIProperty';
 
-export class JFAParamUniforms 
-{
-    public texelSize: BABYLON.Vector4 = new BABYLON.Vector4(0, 0, 0, 0);
-    public jumpDistance: BABYLON.Vector2 = new BABYLON.Vector2(0, 0);
-    public inputValueMode: JFAInputValueMode = JFAInputValueMode.RChannel;
-    @UIBinding({category: "SDF Generation", bindingParams: { label: "Input Value Threshold", min: 0, max: 1, step:0.01 } })
-    public inputValueThreshold: number = 0.5;
-    @UIBinding({category: "SDF Generation", bindingParams: { label: "Input Invert", type: 'boolean' } })
-    public inputInvert: boolean = true;
-    public interactSphere: BABYLON.Vector4 = new BABYLON.Vector4(0, 0, 0, 0);
-}
-
 enum JFAInputValueMode
 {
     RChannel = 0,
@@ -25,6 +13,27 @@ enum JFAInputValueMode
     AChannel = 3,
     Luminance = 4,
 }
+
+
+export class JFAParamUniforms 
+{
+    public texelSize: BABYLON.Vector4 = new BABYLON.Vector4(0, 0, 0, 0);
+    public jumpDistance: BABYLON.Vector2 = new BABYLON.Vector2(0, 0);
+    @UIBinding({category: "SDF Generation", bindingParams: { label: "Input Value Mode", options: {
+        "RChannel": JFAInputValueMode.RChannel,
+        "GChannel": JFAInputValueMode.GChannel,
+        "BChannel": JFAInputValueMode.BChannel,
+        "AChannel": JFAInputValueMode.AChannel,
+        "Luminance": JFAInputValueMode.Luminance,
+    }}})
+    public inputValueMode: JFAInputValueMode = JFAInputValueMode.RChannel;
+    @UIBinding({category: "SDF Generation", bindingParams: { label: "Input Value Threshold", min: 0, max: 1, step:0.01 } })
+    public inputValueThreshold: number = 0.5;
+    @UIBinding({category: "SDF Generation", bindingParams: { label: "Input Invert", type: 'boolean' } })
+    public inputInvert: boolean = true;
+    public interactSphere: BABYLON.Vector4 = new BABYLON.Vector4(0, 0, 0, 0);
+}
+
 
 export default class JumpFloodingSDFGenerator 
 {

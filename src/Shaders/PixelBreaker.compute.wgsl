@@ -338,7 +338,7 @@ fn FillIndirectArgs(@builtin(global_invocation_id) globalId: vec3<u32>)
 
 fn RandomDirection(hash: u32) -> vec2<f32>
 {
-    return normalize(UnpackColor(Hash(hash)).rg * 2.0 - 1.0);
+    return SafeNormalize(UnpackColor(Hash(hash)).rg * 2.0 - 1.0);
 }
 
 @compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
@@ -478,6 +478,12 @@ fn IsParticleEnteredDeadZone(position: vec2<f32>) -> bool
 }
 
 
+fn isnan(value: f32) -> bool 
+{
+    let bits = bitcast<u32>(value);
+    return (bits & 0x7FFFFFFFu) > 0x7F800000u;
+}
+
 struct RayIntersectsAABB2DResult
 {
     intersects: bool,
@@ -517,7 +523,7 @@ fn ApplyReflectionBoardCollisionConstraint(prevPosition: vec2<f32>,
     let reflectionBoardMin = _Uniforms._ReflectionBoardRectMinMax.xy;
     let reflectionBoardMax = _Uniforms._ReflectionBoardRectMinMax.zw;
 
-    let rayDir = normalize(*currentVelocity);
+    let rayDir = SafeNormalize(*currentVelocity);
     let rayIntersectsResult = IsRayIntersectsAABB2D(prevPosition, rayDir, 
                                 reflectionBoardMin, reflectionBoardMax);
 
@@ -573,12 +579,13 @@ fn ApplySceneBoundsCollisionConstraint(prevPosition: vec2<f32>,
     let boundsMin = vec2<f32>(0.0, 0.0);
     let boundsMax = _Uniforms._RenderTargetTexelSize.zw;
 
-    let rayDir = normalize(*currentVelocity);
+    let rayDir = SafeNormalize(*currentVelocity);
     let rayIntersectsResult = IsRayIntersectsAABB2D(prevPosition, rayDir, 
                                 boundsMin, boundsMax);
 
     if (!rayIntersectsResult.intersects)
     {
+        *currentPosition = clamp(*currentPosition, boundsMin, boundsMax);
         return;
     }
 
@@ -586,6 +593,7 @@ fn ApplySceneBoundsCollisionConstraint(prevPosition: vec2<f32>,
     // No hit
     if(rayIntersectsResult.tMax > moveDistancePrevToCurrent)
     {
+        *currentPosition = clamp(*currentPosition, boundsMin, boundsMax);
         return;
     }
 
@@ -615,6 +623,7 @@ fn ApplySceneBoundsCollisionConstraint(prevPosition: vec2<f32>,
     }
     *currentVelocity = reflect(*currentVelocity, hitNormal);
     *currentPosition = hitPoint + hitNormal * kTolerance;
+    *currentPosition = clamp(*currentPosition, boundsMin, boundsMax);
 }
 
 
@@ -656,9 +665,8 @@ fn IsParticleCollidingStaticParticle(position: vec2<f32>, velocity: vec2<f32>,
     let staticParticleState = ReadPrevParticleState(u32(staticParticleID1D));
 
     *collidedStaticParticleState = staticParticleState;
-    
-    let randomDirection = normalize(UnpackColor(Hash(u32(staticParticleID1D) + u32(_Uniforms._Time))).rg * 2.0 - 1.0);
-    var newVelocity = reflect(velocity, randomDirection);
+    let randomDirection = SafeNormalize(UnpackColor(Hash(u32(staticParticleID1D) + u32(_Uniforms._Time))).rg * 2.0 - 1.0);
+    var newVelocity = reflect(velocity, SafeNormalize(randomDirection));
 
     if(abs(newVelocity.y) > abs(newVelocity.x) && newVelocity.y > 0.0)
     {
@@ -678,7 +686,7 @@ fn ClampParticleSpeed(velocity: ptr<function, vec2<f32>>, maxSpeed: f32)
     let useFixedSpeed = _Uniforms._DynamicParticleSpeedParams.z > 0.5;
     let fixedSpeed = _Uniforms._DynamicParticleSpeedParams.w;
     let speed = length(*velocity);
-    let direction = normalize(*velocity);
+    let direction = SafeNormalize(*velocity);
     if (useFixedSpeed)
     {
         *velocity = direction * fixedSpeed;
@@ -735,12 +743,10 @@ fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f
     
     if (isInsideDf)
     {
-        let collisionStrength = _Uniforms._DistanceFieldForceParams.y
-                    * _Uniforms._RenderTargetTexelSize.zw * 0.25;
+        let collisionStrength = _Uniforms._DistanceFieldForceParams.y;
         (*state).velocity += dfGradient * collisionStrength * dt;
         
-        let swirlStrength = _Uniforms._DistanceFieldForceParams.w
-                            * _Uniforms._RenderTargetTexelSize.zw * 0.25;
+        let swirlStrength = _Uniforms._DistanceFieldForceParams.w;
         (*state).velocity += dfTangent * swirlStrength * dt;
         
         *maxSpeed = min(*maxSpeed * mix(1.5, 3.5, pow(df, 0.3)), 8000.0);
@@ -753,8 +759,7 @@ fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f
         }
         else
         {
-            let swirlStrength = _Uniforms._DistanceFieldForceParams.z
-                    * _Uniforms._RenderTargetTexelSize.zw * 0.25;
+            let swirlStrength = _Uniforms._DistanceFieldForceParams.z;
             (*state).velocity += dfTangent * swirlStrength * dt;
         }
     }
@@ -769,14 +774,13 @@ fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f
 fn ApplyParticleMotion_ForceByColor(state : ptr<function, ParticleState>, dt: f32)
 {
     let phaseOffset = state.color.g + _Uniforms._ForceByColorParams.y;
-    var forceDir = normalize(vec2<f32>(state.color.r, 
+    var forceDir = SafeNormalize(vec2<f32>(state.color.r, 
                                         state.color.b) * 2.0 - 1.0);
     let rotation = mat2x2<f32>(vec2<f32>(cos(phaseOffset), -sin(phaseOffset)),
                                vec2<f32>(sin(phaseOffset), cos(phaseOffset)));
     forceDir = rotation * forceDir;
-    forceDir = normalize(forceDir);
-    let forceStrength = _Uniforms._ForceByColorParams.x
-                      * _Uniforms._RenderTargetTexelSize.zw * 0.25;
+    forceDir = SafeNormalize(forceDir);
+    let forceStrength = _Uniforms._ForceByColorParams.x;
     (*state).velocity += forceDir * forceStrength * dt;
 }
 
@@ -807,16 +811,13 @@ fn ApplyParticleMotion_MouseInteraction(state : ptr<function, ParticleState>, dt
     var distanceRemap = distance / radius;
     distanceRemap = saturate(distanceRemap);
     let distanceRemapPow = pow(distanceRemap, falloffExponent);
-    let radialForceStrength = distanceRemapPow * radialStrength
-                            * _Uniforms._RenderTargetTexelSize.zw * 0.25;
-    let swirlForceStrength = swirlStrength
-                            * _Uniforms._RenderTargetTexelSize.zw * 0.25;
+    let radialForceStrength = distanceRemapPow * radialStrength;
+    let swirlForceStrength = swirlStrength;
 
-    let radialForceDir = normalize(mousePosition - state.position);
+    let radialForceDir = SafeNormalize(mousePosition - state.position);
     let swirlForceDir = rotate_90_ccw(radialForceDir);
     (*state).velocity += radialForceDir * radialForceStrength * dt;
     (*state).velocity += swirlForceDir * swirlForceStrength * dt;
-
 }
 
 
@@ -832,6 +833,11 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     var particleState = ReadPrevParticleState(particleSlotID);
     let particleActivateState = ReadPrevParticleActivateState(particleSlotID);
     let deltaTime = min(0.05, _Uniforms._DeltaTime);
+
+    if (IsParticleEnteredDeadZone(particleState.position))
+    {
+        return;
+    }
 
     var maxSpeed = _Uniforms._DynamicParticleSpeedParams.y;
     ApplyParticleMotion_DistanceField(&particleState, deltaTime, &maxSpeed);

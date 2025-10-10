@@ -90,6 +90,8 @@ export class Application
 
         this._controlHintElement = this.CreateControlHintElement();
         videoParentNode.appendChild(this._controlHintElement);
+
+        this._inspector.pane.hidden = true;
     }
 
     private RegisterUITargets(): void
@@ -431,11 +433,13 @@ export class Application
         {
             // ask for first interaction
             this._posterElement = this.CreatePosterElement();
+            document.body.style.backgroundColor = 'black';
             document.body.appendChild(this._posterElement);
             this._posterElement.addEventListener('click', () => {
                 this._posterElement!.remove();
                 this._posterElement = null;
                 this._isFirstInteractionGot = true;
+                this._inspector.pane.hidden = false;
                 this.ToggleApplicationPause();
             });
         }

@@ -27,63 +27,83 @@ struct JFAUniforms {
 @group(0) @binding(2) var _JFA_TempBufferIn: texture_2d<f32>;
 @group(0) @binding(3) var _JFA_TempBufferOut: texture_storage_2d<rgba16float, write>;
 
+fn Luminance(sample: vec4<f32>) -> f32
+{
+    return dot(sample.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
+}
+
 // Helper function to get input value based on mode
-fn GetInputValue(sample: vec4<f32>, mode: u32) -> f32 {
-    switch (mode) {
-        case _JFA_InputValueMode_RChannel: {
+fn GetInputValue(sample: vec4<f32>, mode: u32) -> f32 
+{
+    switch (mode) 
+    {
+        case _JFA_InputValueMode_RChannel: 
+        {
             return sample.r;
         }
-        case _JFA_InputValueMode_GChannel: {
+        case _JFA_InputValueMode_GChannel: 
+        {
             return sample.g;
         }
-        case _JFA_InputValueMode_BChannel: {
+        case _JFA_InputValueMode_BChannel: 
+        {
             return sample.b;
         }
-        case _JFA_InputValueMode_AChannel: {
+        case _JFA_InputValueMode_AChannel: 
+        {
             return sample.a;
         }
-        case _JFA_InputValueMode_Luminance: {
-            return sample.g; // Using green channel for luminance
+        case _JFA_InputValueMode_Luminance: 
+        {
+            return Luminance(sample);
         }
-        default: {
+        default: 
+        {
             return sample.r;
         }
     }
 }
 
 // Helper function to bound index within texture bounds
-fn BoundIndex(id: vec2<i32>, texelSize: vec2<f32>) -> vec2<i32> {
+fn BoundIndex(id: vec2<i32>, texelSize: vec2<f32>) -> vec2<i32> 
+{
     return clamp(id, vec2<i32>(0), vec2<i32>(texelSize - 1.0));
 }
 
 // Helper function to read from temp buffer with bounds checking
-fn ReadInputBuffer(id: vec2<i32>, texelSize: vec2<f32>) -> vec4<f32> {
+fn ReadInputBuffer(id: vec2<i32>, texelSize: vec2<f32>) -> vec4<f32> 
+{
     let boundedId = BoundIndex(id, texelSize);
     return textureLoad(_JFA_TempBufferIn, vec2u(boundedId), 0);
 }
 
-fn LoadJFAInputValue(id: vec2<i32>, texelSize: vec2<f32>) -> i32 {
+fn LoadJFAInputValue(id: vec2<i32>, texelSize: vec2<f32>) -> i32 
+{
     let boundedId = BoundIndex(id, texelSize);
     let inputTextureSample = textureLoad(_JFA_InputTexture, vec2u(boundedId), 0);
     let inputValue = GetInputValue(inputTextureSample, _JFA_Uniforms._JFA_InputValueMode);
     let clampedInputValue = saturate(inputValue);
     var isInside = clampedInputValue < _JFA_Uniforms._JFA_InputValueThreshold;
-    if (_JFA_Uniforms._JFA_InputInvert > 0.5) {
+    if (_JFA_Uniforms._JFA_InputInvert > 0.5) 
+    {
         isInside = !isInside;
     }
     return select(0, 1, isInside);
 }
 
-fn ThreadIDToNormalizedPos(id: vec2<u32>) -> vec2<f32> {
+fn ThreadIDToNormalizedPos(id: vec2<u32>) -> vec2<f32> 
+{
     let texelSize = _JFA_Uniforms._JFA_TexelSize;
     return vec2<f32>(id.xy) * texelSize.xy + texelSize.xy * 0.5;
 }
 
 // JFA Initialize kernel
 @compute @workgroup_size(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)
-fn JFA_Initialize(@builtin(global_invocation_id) globalId: vec3<u32>) {
+fn JFA_Initialize(@builtin(global_invocation_id) globalId: vec3<u32>) 
+{
     let texelSize = _JFA_Uniforms._JFA_TexelSize.zw;
-    if (globalId.x >= u32(texelSize.x) || globalId.y >= u32(texelSize.y)) {
+    if (globalId.x >= u32(texelSize.x) || globalId.y >= u32(texelSize.y)) 
+    {
         return;
     }
 
@@ -138,9 +158,11 @@ fn UpdateMinDistance(curPos: vec2<f32>, neighborPoint: vec4<f32>, minInfo: ptr<f
 
 // JFA Iteration kernel
 @compute @workgroup_size(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)
-fn JFA_Iteration(@builtin(global_invocation_id) globalId: vec3<u32>) {
+fn JFA_Iteration(@builtin(global_invocation_id) globalId: vec3<u32>) 
+{
     let texelSize = _JFA_Uniforms._JFA_TexelSize.zw;
-    if (globalId.x >= u32(texelSize.x) || globalId.y >= u32(texelSize.y)) {
+    if (globalId.x >= u32(texelSize.x) || globalId.y >= u32(texelSize.y)) 
+    {
         return;
     }
 
@@ -171,9 +193,11 @@ fn GetSignedNormalizedDistance(texValue: vec4<f32>) -> f32
 
 // JFA Generate Distance Field kernel
 @compute @workgroup_size(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)
-fn JFA_GenerateDistanceField(@builtin(global_invocation_id) globalId: vec3<u32>) {
+fn JFA_GenerateDistanceField(@builtin(global_invocation_id) globalId: vec3<u32>) 
+{
     let texelSize = _JFA_Uniforms._JFA_TexelSize.zw;
-    if (globalId.x >= u32(texelSize.x) || globalId.y >= u32(texelSize.y)) {
+    if (globalId.x >= u32(texelSize.x) || globalId.y >= u32(texelSize.y)) 
+    {
         return;
     }
 

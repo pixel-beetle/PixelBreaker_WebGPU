@@ -38,6 +38,21 @@ class RenderTargetSizeInfo
     {
         return this.width > 0 && this.height > 0;
     }
+
+    public GetScaleFactorForResolutionIndependentDistanceParams() : number
+    {
+        return this.height;
+    }
+
+    public GetScaleFactorForResolutionIndependentForceParams() : number
+    {
+        return this.height * 0.25;
+    }
+
+    public GetScaleFactorForResolutionIndependentSpeedParams() : number
+    {
+        return this.height * 0.05;
+    }
 }
 
 export class ParticleCountReadbackBuffer
@@ -67,7 +82,7 @@ export class PixelBreakerBoardParams
     @UIBinding({bindingParams: { label: "Y Position", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
     public reflectionBoardPosY01: number = 0.1;
     @UIBinding({bindingParams: { label: "Size", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
-    public reflectionBoardSize01 : BABYLON.Vector2 = new BABYLON.Vector2(0.2, 0.0);
+    public reflectionBoardSize01 : BABYLON.Vector2 = new BABYLON.Vector2(0.0, 0.0);
     @UIBinding({bindingParams: { label: "Color", color : { type: 'float', alpha: true } } } )
     public reflectionBoardColor: BABYLON.Color4 = new BABYLON.Color4(0.95, 0.27, 0.74, 1.0);
 
@@ -132,7 +147,7 @@ export class PixelBreakerParticlesParams
     public dynamicParticleInitialCount: number = 1000000;
 
     @UIBinding({containerPath: "#T/%Spawn/@Dynamic Particle", bindingParams: { label: "Spawn Speed", min:0 } })
-    public dynamicParticleInitialSpeed : number = 300;
+    public dynamicParticleInitialSpeed : number = 5;
 
     @UIGradient({containerPath: "#T/%Spawn/@Color", label: "Particle Spawn Color" })
     public particleSpawnColorGradient: Gradient = GradientUtils.HSV(24);
@@ -141,13 +156,13 @@ export class PixelBreakerParticlesParams
     public particleColorTint: BABYLON.Color4 = new BABYLON.Color4(1.0, 1.0, 1.0, 1.0);
 
     @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Max Speed", min:0 } })
-    public dynamicParticleMaxSpeed: number = 1200;
+    public dynamicParticleMaxSpeed: number = 10;
 
     @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Use Fixed Speed", min:0 } })
     public dynamicParticleUseFixedSpeed : boolean = false;
 
     @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Fixed Speed", min:0 } })
-    public dynamicParticleFixedSpeed : number = 500;
+    public dynamicParticleFixedSpeed : number = 10;
 
 
     @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Enable", type: 'boolean' } })
@@ -183,7 +198,7 @@ export class PixelBreakerParticlesParams
         "Additive": 2,
     } , format: (value: number) => { return value.toFixed(); } } })
     public particleBlendMode: number = 0;
-    @UIBinding({containerPath: "#T/%Render/@Blend", bindingParams: { label: "Sorting Peak Count", min: 1, max: 10, step: 1, format: (value: number) => { return value.toFixed(); } } })
+    @UIBinding({containerPath: "#T/%Render/@Blend", bindingParams: { label: "Sorting Peak Count", min: 1, max: 16, step: 1, format: (value: number) => { return value.toFixed(); } } })
     public sortingPeakCount: number = 4;
     @UIBinding({containerPath: "#T/%Render/@Blend", bindingParams: { label: "Sorting Shift Speed", min: 0.00001, max: 0.001, step: 0.00001 } })
     public sortingShiftSpeed: number = 0.0003;
@@ -192,7 +207,7 @@ export class PixelBreakerParticlesParams
     public particleColorBySpeedGradient: Gradient = GradientUtils.Viridis();
 
     @UIBinding({containerPath: "#T/%Render/@Speed Visualize", bindingParams: { label: "Remap Range" } })
-    public colorBySpeedRamapRange: BABYLON.Vector2 = new BABYLON.Vector2(0, 2500);
+    public colorBySpeedRamapRange: BABYLON.Vector2 = new BABYLON.Vector2(0, 10);
 
     @UIBinding({containerPath: "#T/%Render/@Speed Visualize", bindingParams: { label: "Factor", min: 0, max: 1, step: 0.01 } })
     public colorBySpeedFactor: number = 0.0;
@@ -284,11 +299,11 @@ export class PixelBreakerParticlesParams
 
 export class PixelBreakerMouseInteractionParams
 {
-    @UIBinding({bindingParams: { label: "Radius", min: 0, max: 1000, step: 0.01 } })
-    public radius: number = 300;
+    @UIBinding({bindingParams: { label: "Radius", min: 0, max: 0.5, step: 0.01 } })
+    public radius: number = 0.15;
     
-    @UIBinding({bindingParams: { label: "Radius Mouse Wheel Step", min: 0, max: 100, step: 1 } })
-    public radiusWheelStep : number = 10;
+    @UIBinding({bindingParams: { label: "Radius Mouse Wheel Step", min: 0, max: 0.2, step: 0.01 } })
+    public radiusWheelStep : number = 0.05;
     
     @UIBinding({bindingParams: { label: "Strength", min: 0, step: 0.01 } })
     public strength: number = 200.0;
@@ -310,7 +325,7 @@ export class PixelBreakerMouseInteractionParams
     {
         this.radius = this.radius + wheelDirection * this.radiusWheelStep;
         this.radius = Math.max(this.radius, 0);
-        this.radius = Math.min(this.radius, 1000);
+        this.radius = Math.min(this.radius, 0.5);
     }
 
     public UpdateHasWheelAction(hasAction: boolean)
@@ -328,9 +343,12 @@ export class PixelBreakerMouseInteractionParams
         return new BABYLON.Vector4(this.mousePosition.x, this.mousePosition.y, this.hasWheelAction ? 1 : 0, this.button);
     }
 
-    public GetMouseInteractionParamsUniforms(): BABYLON.Vector4
+    public GetMouseInteractionParamsUniforms(scaleFactor: number, distanceScaleFactor: number): BABYLON.Vector4
     {
-        return new BABYLON.Vector4(this.radius, this.strength, this.swirlStrength, this.falloffExponent);
+        return new BABYLON.Vector4(this.radius * distanceScaleFactor, 
+                    this.strength * scaleFactor, 
+                    this.swirlStrength * scaleFactor, 
+                    this.falloffExponent);
     }
 
     public HandlePropertyChange(property: string, value: any, pixelBreakerManager: PixelBreakerManager)
@@ -647,6 +665,9 @@ export class PixelBreakerManager
     {
         if (!this._computeUBO)
             return;
+        const forceScaleFactor = this._renderTargetSizeInfo.GetScaleFactorForResolutionIndependentForceParams();
+        const speedScaleFactor = this._renderTargetSizeInfo.GetScaleFactorForResolutionIndependentSpeedParams();
+        const distanceScaleFactor = this._renderTargetSizeInfo.GetScaleFactorForResolutionIndependentDistanceParams();
         this._computeUBO.updateFloat("_Time", this._time);
         this._computeUBO.updateFloat("_DeltaTime", this._scene!.deltaTime * 0.001);
         this._computeUBO.updateVector4("_RenderTargetTexelSize", this._renderTargetSizeInfo.texelSize);
@@ -655,10 +676,10 @@ export class PixelBreakerManager
         this._computeUBO.updateFloat("_DynamicParticleSize", this.params.dynamicParticleSize);
 
         const dynamicParticleSpeedParams = new BABYLON.Vector4(
-            this.params.dynamicParticleInitialSpeed, 
-            this.params.dynamicParticleMaxSpeed, 
+            this.params.dynamicParticleInitialSpeed * speedScaleFactor, 
+            this.params.dynamicParticleMaxSpeed * speedScaleFactor, 
             this.params.dynamicParticleUseFixedSpeed ? 1 : 0, 
-            this.params.dynamicParticleFixedSpeed
+            this.params.dynamicParticleFixedSpeed * speedScaleFactor
         );
 
         this._computeUBO.updateVector4("_DynamicParticleSpeedParams", dynamicParticleSpeedParams);
@@ -697,21 +718,29 @@ export class PixelBreakerManager
         this._computeUBO.updateVector4("_StaticParticleSpawnRectMinMax", staticParticleSpawnRectMinMax);
         this._computeUBO.updateVector4("_ReflectionBoardRectMinMax", reflectionBoardRectMinMax);
         this._computeUBO.updateVector4("_ReflectionBoardColor", reflectionBoardColor);
-        const colorBySpeedParams = new BABYLON.Vector4(this.params.colorBySpeedRamapRange.x, this.params.colorBySpeedRamapRange.y, 0, this.params.colorBySpeedFactor);
+        const colorBySpeedParams = new BABYLON.Vector4(
+            this.params.colorBySpeedRamapRange.x * speedScaleFactor, 
+            this.params.colorBySpeedRamapRange.y * speedScaleFactor, 
+            0, 
+            this.params.colorBySpeedFactor);
         this._computeUBO.updateVector4("_ColorBySpeedParams", colorBySpeedParams);
 
         const colorByCollisionParams = new BABYLON.Vector4(this.params.colorChangeWhenCollideWithReflectionBoard, this.params.colorChangeWhenCollideWithStaticParticle, 0, 0);
         this._computeUBO.updateVector4("_ColorByCollisionParams", colorByCollisionParams);
 
         const distanceFieldForceParams = new BABYLON.Vector4(this.params.useDistanceFieldForce ? 1 : 0, 
-            this.params.distanceFieldCollisionStrength, 
-            this.params.distanceFieldSwirlStrength, 
-            this.params.distanceFieldInsideSwirlStrength);
+            this.params.distanceFieldCollisionStrength * forceScaleFactor, 
+            this.params.distanceFieldSwirlStrength * forceScaleFactor, 
+            this.params.distanceFieldInsideSwirlStrength * forceScaleFactor);
         this._computeUBO.updateVector4("_DistanceFieldForceParams", distanceFieldForceParams);
 
         this._computeUBO.updateFloat("_TrailFadeRate", this.params.trailFadeRate);
 
-        const forceByColorParams = new BABYLON.Vector4(this.params.forceByColorStrength, this.params.forceByColorDirRotationOffset, 0, 0);
+        const forceByColorParams = new BABYLON.Vector4(
+            this.params.forceByColorStrength * forceScaleFactor, 
+            this.params.forceByColorDirRotationOffset, 
+            0, 
+            0);
         this._computeUBO.updateVector4("_ForceByColorParams", forceByColorParams);
 
         const softwareRasterizeSortingParams = new BABYLON.Vector4(
@@ -724,7 +753,7 @@ export class PixelBreakerManager
         this._computeUBO.updateVector4("_ParticleColorTint", particleColorTint);
 
 
-        const mouseInteractionParams = this.mouseInteractionParams.GetMouseInteractionParamsUniforms();
+        const mouseInteractionParams = this.mouseInteractionParams.GetMouseInteractionParamsUniforms(forceScaleFactor, distanceScaleFactor);
         const mouseState = this.mouseInteractionParams.GetMouseStateUniforms();
         this._computeUBO.updateVector4("_MousePosition", mouseState);
         this._computeUBO.updateVector4("_MouseInteractionParams", mouseInteractionParams);
@@ -736,6 +765,8 @@ export class PixelBreakerManager
     {
         if (!this._renderUBO)
             return;
+        const forceScaleFactor = this._renderTargetSizeInfo.GetScaleFactorForResolutionIndependentForceParams();
+        const distanceScaleFactor = this._renderTargetSizeInfo.GetScaleFactorForResolutionIndependentDistanceParams();
 
         const reflectionBoardColor = new BABYLON.Vector4(this.boardParams.reflectionBoardColor.r, this.boardParams.reflectionBoardColor.g, this.boardParams.reflectionBoardColor.b, this.boardParams.reflectionBoardColor.a);
         const reflectionBoardRectMinMax = new BABYLON.Vector4(
@@ -749,7 +780,7 @@ export class PixelBreakerManager
         this._renderUBO.updateVector4("_ReflectionBoardRectMinMax", reflectionBoardRectMinMax);
         this._renderUBO.updateVector4("_ReflectionBoardColor", reflectionBoardColor);
 
-        const mouseInteractionParams = this.mouseInteractionParams.GetMouseInteractionParamsUniforms();
+        const mouseInteractionParams = this.mouseInteractionParams.GetMouseInteractionParamsUniforms(forceScaleFactor, distanceScaleFactor);
         const mouseState = this.mouseInteractionParams.GetMouseStateUniforms();
         this._renderUBO.updateVector4("_MousePosition", mouseState);
         this._renderUBO.updateVector4("_MouseInteractionParams", mouseInteractionParams);
