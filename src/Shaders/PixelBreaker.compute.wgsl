@@ -477,37 +477,6 @@ fn IsParticleEnteredDeadZone(position: vec2<f32>) -> bool
     return !IsPointInBounds(position, boundsMin, boundsMax);
 }
 
-fn IsParticleCollidingSceneBounds(position: vec2<f32>, velocity: vec2<f32>, 
- reflectedVelocity: ptr<function, vec2<f32>>, correctedPosition: ptr<function, vec2<f32>>) -> bool
-{
-    let tolerance = 2.0;
-    if (abs(position.y - _Uniforms._RenderTargetTexelSize.w) <= tolerance)
-    {
-        *reflectedVelocity = reflect(velocity, vec2<f32>(0, -1));
-        *correctedPosition = vec2<f32>(position.x, _Uniforms._RenderTargetTexelSize.w - tolerance);
-        return true;
-    }
-    if ( IsBottomBoundaryCollisionEnabled() && abs(position.y) <= tolerance)
-    {
-        *reflectedVelocity = reflect(velocity, vec2<f32>(0, 1));
-        *correctedPosition = vec2<f32>(position.x, tolerance);
-        return true;
-    }
-    if (abs(position.x) <= tolerance)
-    {
-        *reflectedVelocity = reflect(velocity, vec2<f32>(-1, 0));
-        *correctedPosition = vec2<f32>(tolerance, position.y);
-        return true;
-    }
-    if (abs(position.x - _Uniforms._RenderTargetTexelSize.z) <= tolerance)
-    {
-        *reflectedVelocity = reflect(velocity, vec2<f32>(1, 0));
-        *correctedPosition = vec2<f32>(_Uniforms._RenderTargetTexelSize.z - tolerance, position.y);
-        return true;
-    }
-    return false;
-}
-
 
 struct RayIntersectsAABB2DResult
 {
@@ -534,57 +503,118 @@ fn IsRayIntersectsAABB2D(rayOrigin: vec2f, rayDir: vec2f, aabbMin: vec2f, aabbMa
     return RayIntersectsAABB2DResult(hit > 0.5, tNear, tFar);
 }
 
-fn IsParticleCollidingReflectionBoard(position: vec2<f32>, velocity: vec2<f32>, 
-    reflectedVelocity: ptr<function, vec2<f32>>, 
-    correctedPosition: ptr<function, vec2<f32>>) -> bool
+fn ApplyReflectionBoardCollisionConstraint(prevPosition: vec2<f32>, 
+        dt : f32,
+        currentVelocity: ptr<function, vec2<f32>>,
+        currentPosition: ptr<function, vec2<f32>>,
+        currentColor: ptr<function, vec4<f32>>)
 {
-    *reflectedVelocity = velocity;
     if (!IsReflectionBoardCollisionEnabled())
     {   
-        return false;
+        return;
     }
-    
+
     let reflectionBoardMin = _Uniforms._ReflectionBoardRectMinMax.xy;
     let reflectionBoardMax = _Uniforms._ReflectionBoardRectMinMax.zw;
 
-    let rayDir = normalize(velocity);
-    let rayIntersectsResult = IsRayIntersectsAABB2D(position, rayDir, 
+    let rayDir = normalize(*currentVelocity);
+    let rayIntersectsResult = IsRayIntersectsAABB2D(prevPosition, rayDir, 
                                 reflectionBoardMin, reflectionBoardMax);
 
-    const kTolerance = 1.0;
-    if (rayIntersectsResult.intersects && rayIntersectsResult.tMin < 1.0)
+    if (!rayIntersectsResult.intersects)
     {
-        let hitPoint = position + rayDir * rayIntersectsResult.tMin;
-        var hitNormal = vec2<f32>(0.0, 1.0);
-        // left 
-        if (abs(hitPoint.x - reflectionBoardMin.x) < kTolerance
-            && velocity.x > 0.0)
-        {
-            hitNormal = vec2<f32>(-1.0, 0.0);
-        }
-        // right
-        else if (abs(hitPoint.x - reflectionBoardMax.x) < kTolerance
-            && velocity.x < 0.0)
-        {
-            hitNormal = vec2<f32>(1.0, 0.0);
-        }
-        // bottom
-        else if (abs(hitPoint.y - reflectionBoardMin.y) < kTolerance
-            && velocity.y > 0.0)
-        {
-            hitNormal = vec2<f32>(0.0, -1.0);
-        }
-        // top
-        else if (abs(hitPoint.y - reflectionBoardMax.y) < kTolerance
-            && velocity.y < 0.0)
-        {
-            hitNormal = vec2<f32>(0.0, 1.0);
-        }
-        *reflectedVelocity = reflect(velocity, hitNormal);
-        *correctedPosition = hitPoint + hitNormal * kTolerance;
-        return true;
+        return;
     }
-    return false;
+
+    let moveDistancePrevToCurrent = length(*currentVelocity) * dt;
+    // No hit
+    if(rayIntersectsResult.tMin > moveDistancePrevToCurrent)
+    {
+        return;
+    }
+
+    let colorTransitionFactor = _Uniforms._ColorByCollisionParams.x;
+    *currentColor = mix(*currentColor, _Uniforms._ReflectionBoardColor, colorTransitionFactor);
+
+    const kTolerance = 1.0;
+
+    let hitPoint = prevPosition + rayDir * rayIntersectsResult.tMin;
+    var hitNormal = vec2<f32>(0.0, 1.0);
+    // collide withleft 
+    if (abs(hitPoint.x - reflectionBoardMin.x) < kTolerance)
+    {
+        hitNormal = vec2<f32>(-1.0, 0.0);
+    }
+    // collide with right
+    else if (abs(hitPoint.x - reflectionBoardMax.x) < kTolerance)
+    {
+        hitNormal = vec2<f32>(1.0, 0.0);
+    }
+    // collide with bottom
+    else if (abs(hitPoint.y - reflectionBoardMin.y) < kTolerance)
+    {
+        hitNormal = vec2<f32>(0.0, -1.0);
+    }
+    // collide with top
+    else if (abs(hitPoint.y - reflectionBoardMax.y) < kTolerance)
+    {
+        hitNormal = vec2<f32>(0.0, 1.0);
+    }
+    *currentVelocity = reflect(*currentVelocity, hitNormal);
+    *currentPosition = hitPoint + hitNormal * kTolerance;
+}
+
+
+fn ApplySceneBoundsCollisionConstraint(prevPosition: vec2<f32>, 
+        dt : f32,
+        currentVelocity: ptr<function, vec2<f32>>,
+        currentPosition: ptr<function, vec2<f32>>)
+{
+    let boundsMin = vec2<f32>(0.0, 0.0);
+    let boundsMax = _Uniforms._RenderTargetTexelSize.zw;
+
+    let rayDir = normalize(*currentVelocity);
+    let rayIntersectsResult = IsRayIntersectsAABB2D(prevPosition, rayDir, 
+                                boundsMin, boundsMax);
+
+    if (!rayIntersectsResult.intersects)
+    {
+        return;
+    }
+
+    let moveDistancePrevToCurrent = length(*currentVelocity) * dt;
+    // No hit
+    if(rayIntersectsResult.tMax > moveDistancePrevToCurrent)
+    {
+        return;
+    }
+
+    const kTolerance = 1.0;
+
+    let hitPoint = prevPosition + rayDir * rayIntersectsResult.tMax;
+    var hitNormal = vec2<f32>(0.0, 1.0);
+    // collide withleft 
+    if (abs(hitPoint.x - boundsMin.x) < kTolerance)
+    {
+        hitNormal = vec2<f32>(1.0, 0.0);
+    }
+    // collide with right
+    else if (abs(hitPoint.x - boundsMax.x) < kTolerance)
+    {
+        hitNormal = vec2<f32>(-1.0, 0.0);
+    }
+    // collide with bottom
+    else if (abs(hitPoint.y - boundsMin.y) < kTolerance)
+    {
+        hitNormal = vec2<f32>(0.0, 1.0);
+    }
+    // collide with top
+    else if (abs(hitPoint.y - boundsMax.y) < kTolerance)
+    {
+        hitNormal = vec2<f32>(0.0, -1.0);
+    }
+    *currentVelocity = reflect(*currentVelocity, hitNormal);
+    *currentPosition = hitPoint + hitNormal * kTolerance;
 }
 
 
@@ -813,23 +843,10 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     var newPosition = particleState.position + newVelocity * deltaTime;
     var newColor = particleState.color;
 
-    var positionAfterCollision = vec2<f32>(0.0, 0.0);
-    var velocityAfterCollision = vec2<f32>(0.0, 0.0);
+    ApplyReflectionBoardCollisionConstraint(particleState.position, deltaTime, &newVelocity, &newPosition, &newColor);
+    ApplySceneBoundsCollisionConstraint(particleState.position, deltaTime, &newVelocity, &newPosition);
 
-    if (IsParticleCollidingReflectionBoard(newPosition, newVelocity, &velocityAfterCollision, &positionAfterCollision))
-    {
-        newPosition = positionAfterCollision;
-        newVelocity = velocityAfterCollision;
-        let colorTransitionFactor = _Uniforms._ColorByCollisionParams.x;
-        newColor = mix(newColor, _Uniforms._ReflectionBoardColor, colorTransitionFactor);
-    }
-
-    if (IsParticleCollidingSceneBounds(newPosition, newVelocity, &velocityAfterCollision, &positionAfterCollision))
-    {
-        newPosition = positionAfterCollision;
-        newVelocity = velocityAfterCollision;
-    }
-
+    var velocityAfterCollision = newVelocity;
     var collidedStaticParticleID = 0u;
     var collidedStaticParticleState = ParticleState();
     if (IsParticleCollidingStaticParticle(newPosition, newVelocity, &velocityAfterCollision, &collidedStaticParticleID, &collidedStaticParticleState))
