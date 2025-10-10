@@ -1,5 +1,5 @@
 import * as BABYLON from 'babylonjs';
-import jfaComputeShader from '../../shaders/JumpFlooding2D.compute.wgsl';
+import jfaComputeShader from '../../Shaders/JumpFlooding2D.compute.wgsl';
 import { DoubleBufferedRawTexture2D } from '../GfxUtils/DoubleBufferUtils';
 import { ComputeShaderSet } from '../GfxUtils/ComputeShaderSet';
 import MathUtils from '../MathUtils/MathUtils';

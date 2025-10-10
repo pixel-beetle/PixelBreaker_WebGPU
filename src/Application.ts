@@ -295,7 +295,6 @@ export class Application
                     break;
                 case BABYLON.PointerEventTypes.POINTERDOWN:
                     const button = pointerInfo.event.button;
-                    console.log(button);
                     this._pixelBreakerManager.mouseInteractionParams.UpdateButton(button);
                     break;
                 case BABYLON.PointerEventTypes.POINTERUP:
