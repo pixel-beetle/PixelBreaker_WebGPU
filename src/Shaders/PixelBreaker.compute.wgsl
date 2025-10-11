@@ -106,11 +106,45 @@ struct ParticleState
 }
 
 
+fn SHT_GetGridCoord_2D(pos: vec2<f32>, gridSize: f32) -> vec2<i32>
+{
+    let x = i32(pos.x / gridSize);
+    let y = i32(pos.y / gridSize);
+    return vec2<i32>(x, y);
+}
+
+fn SHT_GetGridCoord3D(pos: vec3<f32>, gridSize: f32) -> vec3<i32>
+{
+    let x = i32(pos.x / gridSize);
+    let y = i32(pos.y / gridSize);
+    let z = i32(pos.z / gridSize);
+    return vec3<i32>(x, y, z);
+}
+
+
+fn SHT_GetGridHash_2D(coord: vec2<i32>) -> u32
+{
+    let hash = (coord.x * 92837111) ^ (coord.y * 689287499);
+    return u32(abs(hash));
+}
+
+fn SHT_GetGridHash_3D(coord: vec3<i32>) -> u32
+{
+    let hash = (coord.x * 92837111) ^ (coord.y * 689287499) ^ (coord.z * 283923481);
+    return u32(abs(hash));
+}
+
+
+
 const PACKED_PARTICLE_STATE_SIZE = 3;
+const UINT_MAX = u32(0xFFFFFFFF);
 
 
 struct Uniforms
 {
+    _SHT_GridSize: f32,
+    _SHT_TableEntryCount: u32,
+
     _Time: f32,
     _DeltaTime: f32,
 
@@ -164,10 +198,22 @@ struct Uniforms
 
 @group(0) @binding(13) var<storage, read_write> _IndirectDispatchArgsBuffer_RW: array<u32>;
 
+
+@group(0) @binding(14) var<storage, read> _SHT_TableEntryBuffer_R: array<u32>;
+@group(0) @binding(15) var<storage, read> _SHT_TableLinkedListNodesCountBuffer_R: array<u32>;
+@group(0) @binding(16) var<storage, read> _SHT_TableLinkedListNodesBuffer_R: array<u32>;
+
+@group(0) @binding(17) var<storage, read_write> _SHT_TableEntryBuffer_RW: array<atomic<u32>>;
+@group(0) @binding(18) var<storage, read_write> _SHT_TableLinkedListNodesCountBuffer_RW: array<atomic<u32>>;
+@group(0) @binding(19) var<storage, read_write> _SHT_TableLinkedListNodesBuffer_RW: array<u32>;
+
+
 @group(1) @binding(0) var _sampler_bilinear_clamp: sampler;
 @group(1) @binding(1) var _DistanceFieldTexture: texture_2d<f32>;
 @group(1) @binding(2) var _ParticleSpawnColorGradientTexture: texture_2d<f32>;
 @group(1) @binding(3) var _ParticleColorBySpeedGradientTexture: texture_2d<f32>;
+
+
 
 const PARTICLE_ACTIVATE_STATE_UNINITIALIZED = 0u;
 const PARTICLE_ACTIVATE_STATE_STATIC = 1u;
@@ -262,7 +308,69 @@ fn AtomicMarkParticlePreDynamicCandidate(id: u32) -> bool
 }
 
 
+struct SHT_TableLinkedListNode
+{
+    particleSlotID: u32,
+    nextTableEntryIndex: u32,
+}
+
+
+fn SHT_WriteTableLinkedListNode(linkedListNodeIndex: u32, linkedListNode: SHT_TableLinkedListNode)
+{
+    _SHT_TableLinkedListNodesBuffer_RW[linkedListNodeIndex * 2] = linkedListNode.particleSlotID;
+    _SHT_TableLinkedListNodesBuffer_RW[linkedListNodeIndex * 2 + 1] = linkedListNode.nextTableEntryIndex;
+}
+
+fn SHT_ReadTableLinkedListNode(linkedListNodeIndex: u32) -> SHT_TableLinkedListNode
+{
+    return SHT_TableLinkedListNode(
+        _SHT_TableLinkedListNodesBuffer_R[linkedListNodeIndex * 2],
+        _SHT_TableLinkedListNodesBuffer_R[linkedListNodeIndex * 2 + 1]
+    );
+}
+
 const THREAD_GROUP_SIZE_X = 128u;
+
+@compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
+fn SHT_ClearTable(@builtin(global_invocation_id) globalId: vec3<u32>)
+{
+    if (globalId.x >= _Uniforms._SHT_TableEntryCount)
+    {
+        return;
+    }
+
+    if(globalId.x == 0u)
+    {
+        atomicStore(&_SHT_TableLinkedListNodesCountBuffer_RW[0], 0u);
+    }
+
+    atomicStore(&_SHT_TableEntryBuffer_RW[globalId.x], UINT_MAX);
+}
+
+
+@compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
+fn SHT_FillTable(@builtin(global_invocation_id) globalId: vec3<u32>)
+{
+    let activeDynamicParticleCount = GetPrevDynamicParticleCount();
+    if (globalId.x >= activeDynamicParticleCount)
+    {
+        return;
+    }
+
+    let particleSlotID = _ActiveDynamicParticleSlotIndexBuffer_R[globalId.x];
+    let particleState = ReadPrevParticleState(particleSlotID);
+    
+    let gridCoord = SHT_GetGridCoord_2D(particleState.position.xy, _Uniforms._SHT_GridSize);
+    let gridHashKey = SHT_GetGridHash_2D(gridCoord) % _Uniforms._SHT_TableEntryCount;
+    
+    let linkedListNodeIndex = atomicAdd(&_SHT_TableLinkedListNodesCountBuffer_RW[0], 1u);
+    let prevLinkedListHeadNodeIndex = atomicExchange(&_SHT_TableEntryBuffer_RW[gridHashKey], linkedListNodeIndex);
+
+    let linkedListNode = SHT_TableLinkedListNode(particleSlotID, prevLinkedListHeadNodeIndex);
+    SHT_WriteTableLinkedListNode(linkedListNodeIndex, linkedListNode);
+}
+
+
 
 @compute @workgroup_size(1, 1, 1)
 fn InitialFillParticleCountBuffer(@builtin(global_invocation_id) globalId: vec3<u32>)

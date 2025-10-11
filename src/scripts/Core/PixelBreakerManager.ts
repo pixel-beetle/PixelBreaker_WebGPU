@@ -12,6 +12,7 @@ import { SharedTextureSamplerCollection } from "../GfxUtils/SharedTextureSampler
 import { UIBinding, UIGradient } from '../GUI/UIProperty';
 import { GradientUtils, GradientTexture } from '../GfxUtils/ColorGradient';
 import { GradientBladeParams, Gradient } from 'tweakpane-plugin-gradient';
+import { GPUSpatialHashTable } from './GPUSpatialHashTable';
 
 
 class RenderTargetSizeInfo
@@ -399,6 +400,7 @@ export class PixelBreakerManager
     private _scene: BABYLON.Scene | null = null;
     private _engine: BABYLON.AbstractEngine | null = null;
 
+    private _gpuSpatialHashTable: GPUSpatialHashTable | null = null;
     private _computeUBO: UniformBuffer | null = null;
     private _renderUBO: UniformBuffer | null = null;
     
@@ -437,6 +439,11 @@ export class PixelBreakerManager
         {
             console.error("Render target size is not set for PixelBreakerManager");
             return false;
+        }
+
+        if (!this._gpuSpatialHashTable)
+        {
+            this._gpuSpatialHashTable = new GPUSpatialHashTable(this._engine!);
         }
 
         if (!this._renderUBO)
@@ -636,6 +643,11 @@ export class PixelBreakerManager
             this.particleColorBySpeedGradientTexture = null;
         }
 
+        if (this._gpuSpatialHashTable)
+            this._gpuSpatialHashTable.Release();
+
+        this._gpuSpatialHashTable = null;
+
         this._computeUBO = null;
         this._renderUBO = null;
         this._particleMemoryBuffer = null;
@@ -758,6 +770,12 @@ export class PixelBreakerManager
         this._computeUBO.updateVector4("_MousePosition", mouseState);
         this._computeUBO.updateVector4("_MouseInteractionParams", mouseInteractionParams);
 
+        if (this._gpuSpatialHashTable)
+        {
+            this._computeUBO.updateFloat("_SHT_GridSize", this._gpuSpatialHashTable.gridCellSize);
+            this._computeUBO.updateUInt("_SHT_TableEntryCount", this._gpuSpatialHashTable.tableEntryCount);
+        }
+
         this._computeUBO.update();
     }
 
@@ -820,6 +838,24 @@ export class PixelBreakerManager
         this._activeDynamicParticleSlotIndexBuffer!.Swap();
         this._activeStaticParticleSlotIndexBuffer!.Swap();
         this._softwareRasterTargetBuffer!.Swap();
+
+        if (this._gpuSpatialHashTable)
+        {
+            const TOTAL_PARTICLE_CAPACITY = this.params.dynamicParticleInitialCount + this._renderTargetSizeInfo.totalTexelCount;
+            this._gpuSpatialHashTable.InitializeIfNeeded(TOTAL_PARTICLE_CAPACITY, this._computeShaderSet!);
+            this._gpuSpatialHashTable.DispatchClearTable(this._computeUBO!);
+            this._gpuSpatialHashTable.DispatchFillTable(this._computeUBO!, 
+                this._particleMemoryBuffer!.Prev()!, 
+                this._particleCountBuffer!.Prev()!, 
+                this._activeDynamicParticleSlotIndexBuffer!.Prev()!, 
+                this._indirectDispatchArgsBuffer!.storageBuffer!,
+                0 // use the same indirect args as dynamic particles update
+            );
+        }
+        else
+        {
+            console.warn("Failed to dispatch spatial hash table, it is not initialized");
+        }
 
         this.DispatchClearParticleCounter();
         this.DispatchUpdateStaticParticles();
