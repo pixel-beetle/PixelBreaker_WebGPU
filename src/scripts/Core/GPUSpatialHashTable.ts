@@ -5,12 +5,18 @@ import { UIBinding } from "../GUI/UIProperty";
 
 export class GPUSpatialHashTable 
 {
-    @UIBinding({category: "Spatial Hash Table", bindingParams: { label: "Grid Cell Size", min: 1, max: 16, step:1 } })
-    public gridCellSize: number = 4;
     // stores the linked list head for each hash bucket
     private _tableEntryBuffer: StorageBuffer | null = null;
+    public get tableEntryBuffer(): StorageBuffer | null
+    {
+        return this._tableEntryBuffer;
+    }
     // stores the next index for each linked list node
     private _tableLinkedListNodesBuffer: StorageBuffer | null = null;
+    public get tableLinkedListNodesBuffer(): StorageBuffer | null
+    {
+        return this._tableLinkedListNodesBuffer;
+    }
     private _tableLinkedListNodesCountBuffer: StorageBuffer | null = null;
 
     private _totalParticleCapacity: number = 0;
@@ -23,10 +29,9 @@ export class GPUSpatialHashTable
     }
     private _computeShaderSet: ComputeShaderSet | null = null;
 
-    public constructor(engine: AbstractEngine, tableEntryCount: number = 32768)
+    public constructor(engine: AbstractEngine)
     {
         this._engine = engine;
-        this._tableEntryCount = tableEntryCount;
     }
 
     public InitializeIfNeeded(totalParticleCapacity: number, computeShaderSet: ComputeShaderSet)
@@ -38,8 +43,11 @@ export class GPUSpatialHashTable
         const STORAGE_BUFFER_CREATION_FLAGS = BABYLON.Constants.BUFFER_CREATIONFLAG_STORAGE | BABYLON.Constants.BUFFER_CREATIONFLAG_READWRITE;
         this._computeShaderSet = computeShaderSet;
 
-        if (!this._tableEntryBuffer)
+        if (!this._tableEntryBuffer || linkedListBufferNeedRealloc)
         {
+            this._tableEntryCount = totalParticleCapacity + 1;
+            if (this._tableEntryBuffer)
+                this._tableEntryBuffer.dispose();
             this._tableEntryBuffer = new StorageBuffer(
                 (this._engine as WebGPUEngine)!,
                 this._tableEntryCount * sizeOfUInt,
@@ -50,6 +58,8 @@ export class GPUSpatialHashTable
 
         if (!this._tableLinkedListNodesBuffer || linkedListBufferNeedRealloc)
         {
+            if (this._tableLinkedListNodesBuffer)
+                this._tableLinkedListNodesBuffer.dispose();
             // each node:
             // particle index in particle memory buffer
             // next slot index in linked list buffer

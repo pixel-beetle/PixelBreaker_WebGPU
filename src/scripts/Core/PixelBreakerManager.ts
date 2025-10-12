@@ -54,6 +54,11 @@ class RenderTargetSizeInfo
     {
         return this.height * 0.05;
     }
+
+    public GetScaleFactorForResolutionIndependentParticleSizeParams() : number
+    {
+        return this.height / 360;
+    }
 }
 
 export class ParticleCountReadbackBuffer
@@ -156,42 +161,60 @@ export class PixelBreakerParticlesParams
     @UIBinding({containerPath: "#T/%Spawn/@Color", bindingParams: { label: "Particle Color Tint", color : { type: 'float' } } } )
     public particleColorTint: BABYLON.Color4 = new BABYLON.Color4(1.0, 1.0, 1.0, 1.0);
 
-    @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Max Speed", min:0 } })
-    public dynamicParticleMaxSpeed: number = 10;
+    @UIBinding({containerPath: "#T/%Update/#TT/%Speed", bindingParams: { label: "Max Speed", min:0 } })
+    public dynamicParticleMaxSpeed: number = 18;
 
-    @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Use Fixed Speed", min:0 } })
+    @UIBinding({containerPath: "#T/%Update/#TT/%Speed", bindingParams: { label: "Use Fixed Speed", min:0 } })
     public dynamicParticleUseFixedSpeed : boolean = false;
 
-    @UIBinding({containerPath: "#T/%Update/@Speed", bindingParams: { label: "Fixed Speed", min:0 } })
+    @UIBinding({containerPath: "#T/%Update/#TT/%Speed", bindingParams: { label: "Fixed Speed", min:0 } })
     public dynamicParticleFixedSpeed : number = 10;
 
 
-    @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Enable", type: 'boolean' } })
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@SDF Force", bindingParams: { label: "Enable", type: 'boolean' } })
     public useDistanceFieldForce : boolean = true;
-    @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Collision Strength" } })
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@SDF Force", bindingParams: { label: "Collision Strength" } })
     public distanceFieldCollisionStrength : number = 150;
-    @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Swirl Strength(Outside)" } })
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@SDF Force", bindingParams: { label: "Swirl Strength(Outside)" } })
     public distanceFieldSwirlStrength : number = 15;
-    @UIBinding({containerPath: "#T/%Update/@SDF Force", bindingParams: { label: "Swirl Strength(Inside)" } })
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@SDF Force", bindingParams: { label: "Swirl Strength(Inside)" } })
     public distanceFieldInsideSwirlStrength : number = 8;
 
-    @UIBinding({containerPath: "#T/%Update/@Force By Color", bindingParams: { label: "Strength" } })
+    @UIBinding({containerPath: "#T/%Update/#TT/%Color/@Force By Color", bindingParams: { label: "Strength" } })
     public forceByColorStrength : number = 8.0;
 
-    @UIBinding({containerPath: "#T/%Update/@Force By Color", bindingParams: { label: "Dir Rotation Offset", min: 0, max: 6.28, step: 0.01 } })
+    @UIBinding({containerPath: "#T/%Update/#TT/%Color/@Force By Color", bindingParams: { label: "Dir Rotation Offset", min: 0, max: 6.28, step: 0.01 } })
     public forceByColorDirRotationOffset: number = 1.5;
 
-    @UIBinding({containerPath: "#T/%Update/@Color Change when Collide With", bindingParams: { label: "Reflection Board", min: 0, max: 1, step: 0.01 } })
+    @UIBinding({containerPath: "#T/%Update/#TT/%Color/@Color Change When Collide With", bindingParams: { label: "Reflection Board", min: 0, max: 1, step: 0.01 } })
     public colorChangeWhenCollideWithReflectionBoard : number = 0;
     
-    @UIBinding({containerPath: "#T/%Update/@Color Change when Collide With", bindingParams: { label: "Static Particles", min: 0, max: 1, step: 0.01 } })
+    @UIBinding({containerPath: "#T/%Update/#TT/%Color/@Color Change When Collide With", bindingParams: { label: "Static Particles", min: 0, max: 1, step: 0.01 } })
     public colorChangeWhenCollideWithStaticParticle : number = 0;
+
+
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces", bindingParams: { label: "Enable", type: 'boolean' } })
+    public useInterParticleForces : boolean = false;
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces", bindingParams: { label: "Particle Radius", min: 1, max: 64, step: 1 } })
+    public interParticleForcesParticleRadius : number = 2;
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces", bindingParams: { label: "Max Iterations", min: 1, max: 512, step: 1, format: (value: number) => { return value.toFixed(); } } })
+    public interParticleForcesMaxIterationCount : number = 256;
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces", bindingParams: { label: "Max Neighbor Checks Per Cell", min: 1, max: 256, step: 1, format: (value: number) => { return value.toFixed(); } } })
+    public interParticleForcesMaxCheckedParticleCountPerCell : number = 4;
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Separation", bindingParams: { label: "Enable", type: 'boolean' } })
+    public useSeparationForce : boolean = true;
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Separation", bindingParams: { label: "Strength" } })
+    public separationStrength : number = 100;
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Separation", bindingParams: { label: "Distance" } })
+    public separationDistanceThreshold : number = 4;
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Separation", bindingParams: { label: "Falloff Exponent" } })
+    public separationFalloffExponent : number = 1.0;
 
     @UIBinding({containerPath: "#T/%Render/@Size", bindingParams: { label: "Render Size", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
     public dynamicParticleSize: number = 1;
 
-    @UIBinding({containerPath: "#T/%Render/@Trail", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 0.8, step: 0.001 } })
-    public trailFadeRate : number = 0.2;
+    @UIBinding({containerPath: "#T/%Render/@Trail", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 1.0, step: 0.001 } })
+    public trailFadeRate : number = 0.6;
 
     @UIBinding({containerPath: "#T/%Render/@Blend", bindingParams: { label: "Particle Blend Mode", min: 0, max: 5, options:{
         "Stable Sort": 0,
@@ -244,6 +267,30 @@ export class PixelBreakerParticlesParams
                 break;
             case "distanceFieldInsideSwirlStrength":
                 this.distanceFieldInsideSwirlStrength = value;
+                break;
+            case "useInterParticleForces":
+                this.useInterParticleForces = value;
+                break;
+            case "interParticleForcesParticleRadius":
+                this.interParticleForcesParticleRadius = value;
+                break;
+            case "interParticleForcesMaxIterationCount":
+                this.interParticleForcesMaxIterationCount = value;
+                break;
+            case "interParticleForcesMaxCheckedParticleCountPerCell":
+                this.interParticleForcesMaxCheckedParticleCountPerCell = value;
+                break;
+            case "useSeparationForce":
+                this.useSeparationForce = value;
+                break;
+            case "separationStrength":
+                this.separationStrength = value;
+                break;
+            case "separationDistanceThreshold":
+                this.separationDistanceThreshold = value;
+                break;
+            case "separationFalloffExponent":
+                this.separationFalloffExponent = value;
                 break;
             case "dynamicParticleInitialSpeed":
                 this.dynamicParticleInitialSpeed = value;
@@ -405,7 +452,6 @@ export class PixelBreakerManager
     private _renderUBO: UniformBuffer | null = null;
     
     private _particleMemoryBuffer: DoubleBufferedStorageBuffer | null = null;
-    private _particleActivateStateBuffer: DoubleBufferedStorageBuffer | null = null;
     private _particleCountBuffer: DoubleBufferedStorageBuffer | null = null;
     private _activeDynamicParticleSlotIndexBuffer: DoubleBufferedStorageBuffer | null = null;
     private _activeStaticParticleSlotIndexBuffer: DoubleBufferedStorageBuffer | null = null;
@@ -483,8 +529,8 @@ export class PixelBreakerManager
 
             if (this._particleMemoryBuffer)
                 this._particleMemoryBuffer.Release();
-            // UInt Position, UInt Velocity, UInt Color
-            const PARTICLE_STATE_SIZE = 3;
+            // UInt Position, UInt Velocity, UInt Color, Atomic UInt Activate State
+            const PARTICLE_STATE_SIZE = 4;
             this._particleMemoryBuffer = new DoubleBufferedStorageBuffer(
                 this._engine as BABYLON.WebGPUEngine,
                 TOTAL_PARTICLE_CAPACITY * PARTICLE_STATE_SIZE,
@@ -492,19 +538,6 @@ export class PixelBreakerManager
                 "ParticleMemoryBuffer"
             );
             this._particleMemoryBuffer.Create();
-
-
-            if (this._particleActivateStateBuffer)
-                this._particleActivateStateBuffer.Release();
-            // UInt Activate State
-            this._particleActivateStateBuffer = new DoubleBufferedStorageBuffer(
-                this._engine as BABYLON.WebGPUEngine,
-                TOTAL_PARTICLE_CAPACITY * 1,
-                BABYLON.Constants.BUFFER_CREATIONFLAG_STORAGE | BABYLON.Constants.BUFFER_CREATIONFLAG_READWRITE,
-                "ParticleActivateStateBuffer"
-            );
-            this._particleActivateStateBuffer.Create();
-
 
             if (this._particleCountBuffer)
                 this._particleCountBuffer.Release();
@@ -614,9 +647,6 @@ export class PixelBreakerManager
 
         if (this._particleMemoryBuffer)
             this._particleMemoryBuffer.Release();
-
-        if (this._particleActivateStateBuffer)
-            this._particleActivateStateBuffer.Release();
         
         if (this._particleCountBuffer)
             this._particleCountBuffer.Release();
@@ -651,7 +681,6 @@ export class PixelBreakerManager
         this._computeUBO = null;
         this._renderUBO = null;
         this._particleMemoryBuffer = null;
-        this._particleActivateStateBuffer = null;
         this._particleCountBuffer = null;
         this._activeDynamicParticleSlotIndexBuffer = null;
         this._activeStaticParticleSlotIndexBuffer = null;
@@ -672,14 +701,10 @@ export class PixelBreakerManager
         this.Release(false);
     }
 
-
-    private UpdateComputeUBO()
+    private UpdateComputeUBO_BasicParams(speedScaleFactor: number, forceScaleFactor: number, distanceScaleFactor: number)
     {
         if (!this._computeUBO)
             return;
-        const forceScaleFactor = this._renderTargetSizeInfo.GetScaleFactorForResolutionIndependentForceParams();
-        const speedScaleFactor = this._renderTargetSizeInfo.GetScaleFactorForResolutionIndependentSpeedParams();
-        const distanceScaleFactor = this._renderTargetSizeInfo.GetScaleFactorForResolutionIndependentDistanceParams();
         this._computeUBO.updateFloat("_Time", this._time);
         this._computeUBO.updateFloat("_DeltaTime", this._scene!.deltaTime * 0.001);
         this._computeUBO.updateVector4("_RenderTargetTexelSize", this._renderTargetSizeInfo.texelSize);
@@ -719,7 +744,13 @@ export class PixelBreakerManager
             this._staticParticleSpawnRectMax.x, 
             this._staticParticleSpawnRectMax.y,
         );
+        this._computeUBO.updateVector4("_StaticParticleSpawnRectMinMax", staticParticleSpawnRectMinMax);
+    }
 
+    private UpdateComputeUBO_ReflectionBoardParams()
+    {
+        if (!this._computeUBO)
+            return;
         const reflectionBoardRectMinMax = new BABYLON.Vector4(
             this._reflectionBoardRectMin.x, 
             this._reflectionBoardRectMin.y, 
@@ -727,9 +758,75 @@ export class PixelBreakerManager
             this._reflectionBoardRectMax.y
         );
         const reflectionBoardColor = new BABYLON.Vector4(this.boardParams.reflectionBoardColor.r, this.boardParams.reflectionBoardColor.g, this.boardParams.reflectionBoardColor.b, this.boardParams.reflectionBoardColor.a);
-        this._computeUBO.updateVector4("_StaticParticleSpawnRectMinMax", staticParticleSpawnRectMinMax);
         this._computeUBO.updateVector4("_ReflectionBoardRectMinMax", reflectionBoardRectMinMax);
         this._computeUBO.updateVector4("_ReflectionBoardColor", reflectionBoardColor);
+    }
+
+    private UpdateComputeUBO_DistanceFieldForce(forceScaleFactor: number, distanceScaleFactor: number)
+    {
+        if (!this._computeUBO)
+            return;
+        const distanceFieldForceParams = new BABYLON.Vector4(this.params.useDistanceFieldForce ? 1 : 0, 
+            this.params.distanceFieldCollisionStrength * forceScaleFactor, 
+            this.params.distanceFieldSwirlStrength * forceScaleFactor, 
+            this.params.distanceFieldInsideSwirlStrength * forceScaleFactor);
+        this._computeUBO.updateVector4("_DistanceFieldForceParams", distanceFieldForceParams);
+    }
+
+    private UpdateComputeUBO_MouseInteraction(forceScaleFactor: number, distanceScaleFactor: number)
+    {
+        if (!this._computeUBO)
+            return;
+
+        const mouseInteractionParams = this.mouseInteractionParams.GetMouseInteractionParamsUniforms(forceScaleFactor, distanceScaleFactor);
+        const mouseState = this.mouseInteractionParams.GetMouseStateUniforms();
+        this._computeUBO.updateVector4("_MousePosition", mouseState);
+        this._computeUBO.updateVector4("_MouseInteractionParams", mouseInteractionParams);
+    }
+
+    private UpdateComputeUBO_SHT(forceScaleFactor: number, distanceScaleFactor: number, particleSizeScaleFactor: number)
+    {
+        if (!this._computeUBO)
+            return;
+        if (this._gpuSpatialHashTable)
+        {
+            this._computeUBO.updateFloat("_SHT_GridSize", this.params.interParticleForcesParticleRadius * 2.0 * particleSizeScaleFactor);
+            this._computeUBO.updateUInt("_SHT_TableEntryCount", this._gpuSpatialHashTable.tableEntryCount);
+        }
+    }
+
+    private UpdateComputeUBO_InterParticleForces(forceScaleFactor: number, distanceScaleFactor: number, particleSizeScaleFactor: number)
+    {
+        if (!this._computeUBO)
+            return;
+        let interParticleForcesParams = new BABYLON.Vector4(
+            this.params.useInterParticleForces ? 1 : 0,
+            this.params.interParticleForcesParticleRadius * particleSizeScaleFactor,
+            this.params.interParticleForcesMaxIterationCount,
+            this.params.interParticleForcesMaxCheckedParticleCountPerCell
+        );
+        this._computeUBO.updateVector4("_InterParticleForceParams_Base", interParticleForcesParams);
+        let separationParams = new BABYLON.Vector4(
+            this.params.useSeparationForce ? 1 : 0,
+            this.params.separationStrength * forceScaleFactor,
+            this.params.separationDistanceThreshold * particleSizeScaleFactor,
+            this.params.separationFalloffExponent
+        );
+        this._computeUBO.updateVector4("_InterParticleForceParams_Separation", separationParams);
+    }
+
+    private UpdateComputeUBO_Coloring(speedScaleFactor: number, forceScaleFactor: number)
+    {
+        if (!this._computeUBO)
+            return;
+        const particleColorTint = new BABYLON.Vector4(
+            this.params.particleColorTint.r, 
+            this.params.particleColorTint.g, 
+            this.params.particleColorTint.b, 
+            this.params.particleColorTint.a
+        );
+        this._computeUBO.updateVector4("_ParticleColorTint", particleColorTint);
+
         const colorBySpeedParams = new BABYLON.Vector4(
             this.params.colorBySpeedRamapRange.x * speedScaleFactor, 
             this.params.colorBySpeedRamapRange.y * speedScaleFactor, 
@@ -740,41 +837,43 @@ export class PixelBreakerManager
         const colorByCollisionParams = new BABYLON.Vector4(this.params.colorChangeWhenCollideWithReflectionBoard, this.params.colorChangeWhenCollideWithStaticParticle, 0, 0);
         this._computeUBO.updateVector4("_ColorByCollisionParams", colorByCollisionParams);
 
-        const distanceFieldForceParams = new BABYLON.Vector4(this.params.useDistanceFieldForce ? 1 : 0, 
-            this.params.distanceFieldCollisionStrength * forceScaleFactor, 
-            this.params.distanceFieldSwirlStrength * forceScaleFactor, 
-            this.params.distanceFieldInsideSwirlStrength * forceScaleFactor);
-        this._computeUBO.updateVector4("_DistanceFieldForceParams", distanceFieldForceParams);
-
-        this._computeUBO.updateFloat("_TrailFadeRate", this.params.trailFadeRate);
-
         const forceByColorParams = new BABYLON.Vector4(
             this.params.forceByColorStrength * forceScaleFactor, 
             this.params.forceByColorDirRotationOffset, 
             0, 
             0);
         this._computeUBO.updateVector4("_ForceByColorParams", forceByColorParams);
+    }
 
+    private UpdateComputeUBO_SoftwareRasterRender()
+    {
+        if (!this._computeUBO)
+            return;
         const softwareRasterizeSortingParams = new BABYLON.Vector4(
             this.params.sortingPeakCount, 
             this.params.sortingShiftSpeed, 
             this.params.particleBlendMode, 
             0);
         this._computeUBO.updateVector4("_SoftwareRasterizeSortingParams", softwareRasterizeSortingParams);
-        const particleColorTint = new BABYLON.Vector4(this.params.particleColorTint.r, this.params.particleColorTint.g, this.params.particleColorTint.b, this.params.particleColorTint.a);
-        this._computeUBO.updateVector4("_ParticleColorTint", particleColorTint);
+        this._computeUBO.updateFloat("_TrailFadeRate", this.params.trailFadeRate);
+    }
 
-
-        const mouseInteractionParams = this.mouseInteractionParams.GetMouseInteractionParamsUniforms(forceScaleFactor, distanceScaleFactor);
-        const mouseState = this.mouseInteractionParams.GetMouseStateUniforms();
-        this._computeUBO.updateVector4("_MousePosition", mouseState);
-        this._computeUBO.updateVector4("_MouseInteractionParams", mouseInteractionParams);
-
-        if (this._gpuSpatialHashTable)
-        {
-            this._computeUBO.updateFloat("_SHT_GridSize", this._gpuSpatialHashTable.gridCellSize);
-            this._computeUBO.updateUInt("_SHT_TableEntryCount", this._gpuSpatialHashTable.tableEntryCount);
-        }
+    private UpdateComputeUBO()
+    {
+        if (!this._computeUBO)
+            return;
+        const forceScaleFactor = this._renderTargetSizeInfo.GetScaleFactorForResolutionIndependentForceParams();
+        const speedScaleFactor = this._renderTargetSizeInfo.GetScaleFactorForResolutionIndependentSpeedParams();
+        const distanceScaleFactor = this._renderTargetSizeInfo.GetScaleFactorForResolutionIndependentDistanceParams();
+        const particleSizeScaleFactor = this._renderTargetSizeInfo.GetScaleFactorForResolutionIndependentParticleSizeParams();
+        this.UpdateComputeUBO_BasicParams(speedScaleFactor, forceScaleFactor, distanceScaleFactor);
+        this.UpdateComputeUBO_ReflectionBoardParams();
+        this.UpdateComputeUBO_Coloring(speedScaleFactor, forceScaleFactor);
+        this.UpdateComputeUBO_SoftwareRasterRender();
+        this.UpdateComputeUBO_DistanceFieldForce(forceScaleFactor, distanceScaleFactor);
+        this.UpdateComputeUBO_SHT(forceScaleFactor, distanceScaleFactor, particleSizeScaleFactor);
+        this.UpdateComputeUBO_MouseInteraction(forceScaleFactor, distanceScaleFactor);
+        this.UpdateComputeUBO_InterParticleForces(forceScaleFactor, distanceScaleFactor, particleSizeScaleFactor);
 
         this._computeUBO.update();
     }
@@ -833,7 +932,6 @@ export class PixelBreakerManager
         }
 
         this._particleMemoryBuffer!.Swap();
-        this._particleActivateStateBuffer!.Swap();
         this._particleCountBuffer!.Swap();
         this._activeDynamicParticleSlotIndexBuffer!.Swap();
         this._activeStaticParticleSlotIndexBuffer!.Swap();
@@ -894,7 +992,6 @@ export class PixelBreakerManager
 
         kInitialSpawnParticles!.cs!.setUniformBuffer("_Uniforms", this._computeUBO!);
         kInitialSpawnParticles!.cs!.setStorageBuffer("_ParticleMemoryBuffer_RW", this._particleMemoryBuffer!.Current()!);
-        kInitialSpawnParticles!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_RW", this._particleActivateStateBuffer!.Current()!);
         kInitialSpawnParticles!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
         kInitialSpawnParticles!.cs!.setStorageBuffer("_ActiveDynamicParticleSlotIndexBuffer_RW", this._activeDynamicParticleSlotIndexBuffer!.Current()!);
         kInitialSpawnParticles!.cs!.setStorageBuffer("_ActiveStaticParticleSlotIndexBuffer_RW", this._activeStaticParticleSlotIndexBuffer!.Current()!);
@@ -995,8 +1092,8 @@ export class PixelBreakerManager
         kUpdateDynamicParticles!.cs!.setUniformBuffer("_Uniforms", this._computeUBO!);
         kUpdateDynamicParticles!.cs!.setStorageBuffer("_ParticleMemoryBuffer_R", this._particleMemoryBuffer!.Prev()!);
         kUpdateDynamicParticles!.cs!.setStorageBuffer("_ParticleMemoryBuffer_RW", this._particleMemoryBuffer!.Current()!);
-        kUpdateDynamicParticles!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_R", this._particleActivateStateBuffer!.Prev()!);
-        kUpdateDynamicParticles!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_RW", this._particleActivateStateBuffer!.Current()!);
+        kUpdateDynamicParticles!.cs!.setStorageBuffer("_SHT_TableEntryBuffer_R", this._gpuSpatialHashTable!.tableEntryBuffer!);
+        kUpdateDynamicParticles!.cs!.setStorageBuffer("_SHT_TableLinkedListNodesBuffer_R", this._gpuSpatialHashTable!.tableLinkedListNodesBuffer!);
         kUpdateDynamicParticles!.cs!.setStorageBuffer("_ParticleCountBuffer_R", this._particleCountBuffer!.Prev()!);
         kUpdateDynamicParticles!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
         kUpdateDynamicParticles!.cs!.setStorageBuffer("_ActiveDynamicParticleSlotIndexBuffer_R", this._activeDynamicParticleSlotIndexBuffer!.Prev()!);
@@ -1023,8 +1120,6 @@ export class PixelBreakerManager
 
         kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ParticleMemoryBuffer_R", this._particleMemoryBuffer!.Prev()!);
         kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ParticleMemoryBuffer_RW", this._particleMemoryBuffer!.Current()!);
-        kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_R", this._particleActivateStateBuffer!.Prev()!);
-        kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_RW", this._particleActivateStateBuffer!.Current()!);
         kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ParticleCountBuffer_R", this._particleCountBuffer!.Prev()!);
         kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
         kUpdateStaticParticles_CollectStatic!.cs!.setStorageBuffer("_ActiveStaticParticleSlotIndexBuffer_R", this._activeStaticParticleSlotIndexBuffer!.Prev()!);
@@ -1034,8 +1129,6 @@ export class PixelBreakerManager
         kUpdateStaticParticles_ConvertPreDynamic!.cs!.setUniformBuffer("_Uniforms", this._computeUBO!);
         kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ParticleMemoryBuffer_R", this._particleMemoryBuffer!.Prev()!);
         kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ParticleMemoryBuffer_RW", this._particleMemoryBuffer!.Current()!);
-        kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_R", this._particleActivateStateBuffer!.Prev()!);
-        kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ParticleActivateStateBuffer_RW", this._particleActivateStateBuffer!.Current()!);
         kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ParticleCountBuffer_R", this._particleCountBuffer!.Prev()!);
         kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ParticleCountBuffer_RW", this._particleCountBuffer!.Current()!);
         kUpdateStaticParticles_ConvertPreDynamic!.cs!.setStorageBuffer("_ActiveStaticParticleSlotIndexBuffer_R", this._activeStaticParticleSlotIndexBuffer!.Prev()!);

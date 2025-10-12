@@ -39,6 +39,16 @@ fn UnpackParticleVelocity(packedVelocity: u32) -> vec2<f32>
                     kSpeedMin + f32(quantizedY) * (kSpeedMax - kSpeedMin) / 65535.0);
 }
 
+fn rotate_90_ccw(v: vec2<f32>) -> vec2<f32> 
+{
+    return vec2<f32>(-v.y, v.x);
+}
+
+fn rotate_90_cw(v: vec2<f32>) -> vec2<f32> 
+{
+    return vec2<f32>(v.y, -v.x);
+}
+
 fn Hash(input: u32) -> u32 
 {
     var state = input * 747796405u + 2891336453u;
@@ -90,19 +100,29 @@ fn UnpackColor(packed: u32) -> vec4<f32>
     return vec4<f32>(r, g, b, a);
 }
 
+struct StoredParticleState
+{
+    packedPosition: u32,
+    packedVelocity: u32,
+    packedColor: u32,
+    activateState: atomic<u32>
+}
+
 
 struct PackedParticleState
 {
     packedPosition: u32,
     packedVelocity: u32,
-    packedColor: u32
+    packedColor: u32,
+    activateState: u32
 }
 
 struct ParticleState
 {
     position: vec2<f32>,
     velocity: vec2<f32>,
-    color: vec4<f32>
+    color: vec4<f32>,
+    activateState: u32
 }
 
 
@@ -142,9 +162,6 @@ const UINT_MAX = u32(0xFFFFFFFF);
 
 struct Uniforms
 {
-    _SHT_GridSize: f32,
-    _SHT_TableEntryCount: u32,
-
     _Time: f32,
     _DeltaTime: f32,
 
@@ -174,38 +191,48 @@ struct Uniforms
 
     _MousePosition: vec4<f32>, // xy: pos, z:is pressed, w: button
     _MouseInteractionParams: vec4<f32>, // x: radius, y: radial strength, z: swirl strength, w: falloff exponent
+
+    _SHT_GridSize: f32,
+    _SHT_TableEntryCount: u32,
+
+    // x: enable 
+    // y: particle radius 
+    // z: max particles to check per grid cell 
+    // w: max iteration count
+    _InterParticleForceParams_Base: vec4<f32>,
+    // x: enable
+    // y: strength
+    // z: distance
+    // w: falloff exponent
+    _InterParticleForceParams_Separation: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> _Uniforms: Uniforms;
 
-@group(0) @binding(1) var<storage, read>       _ParticleMemoryBuffer_R: array<u32>;
-@group(0) @binding(2) var<storage, read_write> _ParticleMemoryBuffer_RW: array<u32>;
+@group(0) @binding(1) var<storage, read_write> _ParticleMemoryBuffer_R:  array<StoredParticleState>;
+@group(0) @binding(2) var<storage, read_write> _ParticleMemoryBuffer_RW: array<StoredParticleState>;
 
-@group(0) @binding(3) var<storage, read>       _ParticleActivateStateBuffer_R: array<u32>;
-@group(0) @binding(4) var<storage, read_write> _ParticleActivateStateBuffer_RW: array<atomic<u32>>;
+@group(0) @binding(3) var<storage, read>       _ParticleCountBuffer_R: array<u32>;
+@group(0) @binding(4) var<storage, read_write> _ParticleCountBuffer_RW: array<atomic<u32>>;
 
-@group(0) @binding(5) var<storage, read>       _ParticleCountBuffer_R: array<u32>;
-@group(0) @binding(6) var<storage, read_write> _ParticleCountBuffer_RW: array<atomic<u32>>;
+@group(0) @binding(5) var<storage, read>       _ActiveDynamicParticleSlotIndexBuffer_R: array<u32>;
+@group(0) @binding(6) var<storage, read_write> _ActiveDynamicParticleSlotIndexBuffer_RW: array<u32>;
 
-@group(0) @binding(7) var<storage, read>       _ActiveDynamicParticleSlotIndexBuffer_R: array<u32>;
-@group(0) @binding(8) var<storage, read_write> _ActiveDynamicParticleSlotIndexBuffer_RW: array<u32>;
+@group(0) @binding(7) var<storage, read>        _ActiveStaticParticleSlotIndexBuffer_R: array<u32>;
+@group(0) @binding(8) var<storage, read_write> _ActiveStaticParticleSlotIndexBuffer_RW: array<u32>;
 
-@group(0) @binding(9) var<storage, read>        _ActiveStaticParticleSlotIndexBuffer_R: array<u32>;
-@group(0) @binding(10) var<storage, read_write> _ActiveStaticParticleSlotIndexBuffer_RW: array<u32>;
+@group(0) @binding(9) var<storage, read>       _RasterTargetBuffer_R: array<u32>;
+@group(0) @binding(10) var<storage, read_write> _RasterTargetBuffer_RW: array<atomic<u32>>;
 
-@group(0) @binding(11) var<storage, read>       _RasterTargetBuffer_R: array<u32>;
-@group(0) @binding(12) var<storage, read_write> _RasterTargetBuffer_RW: array<atomic<u32>>;
+@group(0) @binding(11) var<storage, read_write> _IndirectDispatchArgsBuffer_RW: array<u32>;
 
-@group(0) @binding(13) var<storage, read_write> _IndirectDispatchArgsBuffer_RW: array<u32>;
+@group(0) @binding(12) var<storage, read> _SHT_TableEntryBuffer_R: array<u32>;
+@group(0) @binding(13) var<storage, read> _SHT_TableLinkedListNodesCountBuffer_R: array<u32>;
+@group(0) @binding(14) var<storage, read> _SHT_TableLinkedListNodesBuffer_R: array<u32>;
 
-
-@group(0) @binding(14) var<storage, read> _SHT_TableEntryBuffer_R: array<u32>;
-@group(0) @binding(15) var<storage, read> _SHT_TableLinkedListNodesCountBuffer_R: array<u32>;
-@group(0) @binding(16) var<storage, read> _SHT_TableLinkedListNodesBuffer_R: array<u32>;
-
-@group(0) @binding(17) var<storage, read_write> _SHT_TableEntryBuffer_RW: array<atomic<u32>>;
-@group(0) @binding(18) var<storage, read_write> _SHT_TableLinkedListNodesCountBuffer_RW: array<atomic<u32>>;
-@group(0) @binding(19) var<storage, read_write> _SHT_TableLinkedListNodesBuffer_RW: array<u32>;
+@group(0) @binding(15) var<storage, read_write> _SHT_TableEntryBuffer_RW: array<atomic<u32>>;
+@group(0) @binding(16) var<storage, read_write> _SHT_TableLinkedListNodesCountBuffer_RW: array<atomic<u32>>;
+@group(0) @binding(17) var<storage, read_write> _SHT_TableLinkedListNodesBuffer_RW: array<u32>;
 
 
 @group(1) @binding(0) var _sampler_bilinear_clamp: sampler;
@@ -261,7 +288,8 @@ fn UnpackParticleState(packedParticleState: PackedParticleState) -> ParticleStat
     return ParticleState(
         UnpackParticlePosition(packedParticleState.packedPosition),
         UnpackParticleVelocity(packedParticleState.packedVelocity),
-        UnpackColor(packedParticleState.packedColor)
+        UnpackColor(packedParticleState.packedColor),
+        packedParticleState.activateState
     );
 }
 
@@ -270,40 +298,49 @@ fn PackParticleState(particleState: ParticleState) -> PackedParticleState
     return PackedParticleState(
         PackParticlePosition(particleState.position),
         PackParticleVelocity(particleState.velocity),
-        PackColor(particleState.color)
+        PackColor(particleState.color),
+        particleState.activateState
     );
 }
 
 fn ReadPrevParticleState(id: u32) -> ParticleState
 {
     var packedParticleState = PackedParticleState();
-    packedParticleState.packedPosition = _ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE];
-    packedParticleState.packedVelocity = _ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE + 1];
-    packedParticleState.packedColor    = _ParticleMemoryBuffer_R[id * PACKED_PARTICLE_STATE_SIZE + 2];
+    packedParticleState.packedPosition = _ParticleMemoryBuffer_R[id].packedPosition;
+    packedParticleState.packedVelocity = _ParticleMemoryBuffer_R[id].packedVelocity;
+    packedParticleState.packedColor    = _ParticleMemoryBuffer_R[id].packedColor;
+    packedParticleState.activateState  = atomicLoad(&(_ParticleMemoryBuffer_R[id].activateState));
     return UnpackParticleState(packedParticleState);
 }
+
+fn ReadPrevParticleState_AssumeDynamic(id: u32) -> ParticleState
+{
+    var packedParticleState = PackedParticleState();
+    packedParticleState.packedPosition = _ParticleMemoryBuffer_R[id].packedPosition;
+    packedParticleState.packedVelocity = _ParticleMemoryBuffer_R[id].packedVelocity;
+    packedParticleState.packedColor    = _ParticleMemoryBuffer_R[id].packedColor;
+    packedParticleState.activateState  = PARTICLE_ACTIVATE_STATE_DYNAMIC;
+    return UnpackParticleState(packedParticleState);
+}
+
 
 fn WriteParticleState(id: u32, particleState: ParticleState)
 {
     let packedParticleState = PackParticleState(particleState);
-    _ParticleMemoryBuffer_RW[id * PACKED_PARTICLE_STATE_SIZE]     = packedParticleState.packedPosition;
-    _ParticleMemoryBuffer_RW[id * PACKED_PARTICLE_STATE_SIZE + 1] = packedParticleState.packedVelocity;
-    _ParticleMemoryBuffer_RW[id * PACKED_PARTICLE_STATE_SIZE + 2] = packedParticleState.packedColor;
-}
-
-fn WriteParticleActivateState(id: u32, particleActivateState: u32)
-{
-    atomicStore(&_ParticleActivateStateBuffer_RW[id], particleActivateState);
+    _ParticleMemoryBuffer_RW[id].packedPosition = packedParticleState.packedPosition;
+    _ParticleMemoryBuffer_RW[id].packedVelocity = packedParticleState.packedVelocity;
+    _ParticleMemoryBuffer_RW[id].packedColor    = packedParticleState.packedColor;
+    atomicStore(&(_ParticleMemoryBuffer_RW[id].activateState), packedParticleState.activateState);
 }
 
 fn ReadPrevParticleActivateState(id: u32) -> u32
 {
-    return _ParticleActivateStateBuffer_R[id];
+    return atomicLoad(&(_ParticleMemoryBuffer_R[id].activateState));
 }
 
 fn AtomicMarkParticlePreDynamicCandidate(id: u32) -> bool
 {
-    let result = atomicCompareExchangeWeak(&_ParticleActivateStateBuffer_RW[id], PARTICLE_ACTIVATE_STATE_STATIC, PARTICLE_ACTIVATE_STATE_PRE_DYNAMIC);
+    let result = atomicCompareExchangeWeak(&(_ParticleMemoryBuffer_RW[id].activateState), PARTICLE_ACTIVATE_STATE_STATIC, PARTICLE_ACTIVATE_STATE_PRE_DYNAMIC);
     return result.exchanged;
 }
 
@@ -311,14 +348,14 @@ fn AtomicMarkParticlePreDynamicCandidate(id: u32) -> bool
 struct SHT_TableLinkedListNode
 {
     particleSlotID: u32,
-    nextTableEntryIndex: u32,
+    nextNodeIndex: u32,
 }
 
 
 fn SHT_WriteTableLinkedListNode(linkedListNodeIndex: u32, linkedListNode: SHT_TableLinkedListNode)
 {
     _SHT_TableLinkedListNodesBuffer_RW[linkedListNodeIndex * 2] = linkedListNode.particleSlotID;
-    _SHT_TableLinkedListNodesBuffer_RW[linkedListNodeIndex * 2 + 1] = linkedListNode.nextTableEntryIndex;
+    _SHT_TableLinkedListNodesBuffer_RW[linkedListNodeIndex * 2 + 1] = linkedListNode.nextNodeIndex;
 }
 
 fn SHT_ReadTableLinkedListNode(linkedListNodeIndex: u32) -> SHT_TableLinkedListNode
@@ -364,6 +401,11 @@ fn SHT_FillTable(@builtin(global_invocation_id) globalId: vec3<u32>)
     let gridHashKey = SHT_GetGridHash_2D(gridCoord) % _Uniforms._SHT_TableEntryCount;
     
     let linkedListNodeIndex = atomicAdd(&_SHT_TableLinkedListNodesCountBuffer_RW[0], 1u);
+    if (linkedListNodeIndex >= _Uniforms._TotalParticleCapacity)
+    {
+        return;
+    }
+
     let prevLinkedListHeadNodeIndex = atomicExchange(&_SHT_TableEntryBuffer_RW[gridHashKey], linkedListNodeIndex);
 
     let linkedListNode = SHT_TableLinkedListNode(particleSlotID, prevLinkedListHeadNodeIndex);
@@ -469,7 +511,8 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
 
     var particleState = ParticleState(vec2<f32>(0.0, 0.0), 
                                       vec2<f32>(0.0, 0.0), 
-                                      vec4<f32>(1.0, 1.0, 1.0, 1.0));
+                                      vec4<f32>(1.0, 1.0, 1.0, 1.0),
+                                      PARTICLE_ACTIVATE_STATE_STATIC);
     var particleActivateState = PARTICLE_ACTIVATE_STATE_STATIC;
 
     var particleStableRandom = f32(Hash(particleSlotID + u32(_Uniforms._Time))) / 4294967296.0;
@@ -496,7 +539,6 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
         var indexInActiveParticleSlotIndexBuffer = IncrementStaticParticleCount();
         _ActiveStaticParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
         WriteParticleState(particleSlotID, particleState);
-        WriteParticleActivateState(particleSlotID, particleActivateState);
     }
     // Dynamic Particle Spawn, From Reflection Board, As Bullets
     else 
@@ -530,7 +572,6 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
         var indexInActiveParticleSlotIndexBuffer = IncrementDynamicParticleCount();
         _ActiveDynamicParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
         WriteParticleState(particleSlotID, particleState);
-        WriteParticleActivateState(particleSlotID, particleActivateState);
     }
 
 }
@@ -822,13 +863,6 @@ fn SafeNormalize(v: vec2<f32>) -> vec2<f32>
     return normalize(v);
 }
 
-fn rotate_90_ccw(v: vec2<f32>) -> vec2<f32> {
-    return vec2<f32>(-v.y, v.x);
-}
-
-fn rotate_90_cw(v: vec2<f32>) -> vec2<f32> {
-    return vec2<f32>(v.y, -v.x);
-}
 
 fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f32, maxSpeed: ptr<function, f32>)
 {
@@ -892,6 +926,104 @@ fn ApplyParticleMotion_ForceByColor(state : ptr<function, ParticleState>, dt: f3
     (*state).velocity += forceDir * forceStrength * dt;
 }
 
+
+const GridOffsetArray = array<vec2<i32>, 9>(
+    vec2<i32>(-1, -1), vec2<i32>(0, -1), vec2<i32>(1, -1),
+    vec2<i32>(-1,  0), vec2<i32>(0,  0), vec2<i32>(1,  0),
+    vec2<i32>(-1,  1), vec2<i32>(0,  1), vec2<i32>(1,  1)
+);
+
+fn ApplyParticleMotion_InterParticleForces( selfParticleSlotID: u32, state : ptr<function, ParticleState>, dt: f32)
+{
+    let enabled = _Uniforms._InterParticleForceParams_Base.x > 0.5;
+    if (!enabled)
+    {
+        return;
+    }
+    let isSeparationEnabled = _Uniforms._InterParticleForceParams_Separation.x > 0.5;
+
+
+    let MAX_ITERATION_COUNT = u32(_Uniforms._InterParticleForceParams_Base.w);
+    let MAX_CHECKED_PARTICLE_COUNT = u32(_Uniforms._InterParticleForceParams_Base.z);
+
+    let GRID_SIZE = _Uniforms._SHT_GridSize;
+    
+    let selfGridCoord = SHT_GetGridCoord_2D(state.position.xy, GRID_SIZE);
+    let selfGridHashKey = SHT_GetGridHash_2D(selfGridCoord) % _Uniforms._SHT_TableEntryCount;
+
+    let separationForceStrength = _Uniforms._InterParticleForceParams_Separation.y;
+    let separationDistanceThreshold = _Uniforms._InterParticleForceParams_Separation.z;
+    let separationFalloffExponent = _Uniforms._InterParticleForceParams_Separation.w;
+
+    var accumulatedForce = vec2<f32>(0.0, 0.0);
+    var totalIterationCount = 0u;
+
+    for (var i = 0; i < 9; i++)
+    {
+        let gridOffsetIndex = i;
+        let gridOffset = GridOffsetArray[gridOffsetIndex];
+        let otherGridCoord = vec2<i32>(selfGridCoord.x + gridOffset.x, 
+                                       selfGridCoord.y + gridOffset.y);
+                                       
+        let otherGridHashKey = SHT_GetGridHash_2D(otherGridCoord) % _Uniforms._SHT_TableEntryCount;
+        var currentLinkedListNodeIndex = _SHT_TableEntryBuffer_R[otherGridHashKey];
+        if (currentLinkedListNodeIndex == UINT_MAX)
+        {
+            continue;
+        }
+
+        var iterationCount = 0u;
+        var checkedParticleCount = 0u;
+        while (true)
+        {
+            if (iterationCount >= MAX_ITERATION_COUNT || checkedParticleCount >= MAX_CHECKED_PARTICLE_COUNT)
+            {
+                break;
+            }
+            if (currentLinkedListNodeIndex == UINT_MAX)
+            {
+                break;
+            }
+            
+            iterationCount++;
+            totalIterationCount++;
+
+            let linkedListNode = SHT_ReadTableLinkedListNode(currentLinkedListNodeIndex);
+            currentLinkedListNodeIndex = linkedListNode.nextNodeIndex;
+            let particleSlotIDToCheck = linkedListNode.particleSlotID;
+            // only check particles that are after current particle to avoid double counting
+            if (particleSlotIDToCheck <= selfParticleSlotID)
+            {
+                continue;
+            }
+
+            checkedParticleCount++;
+
+            let otherParticleState = ReadPrevParticleState_AssumeDynamic(particleSlotIDToCheck);
+            let otherParticleVelocity = otherParticleState.velocity;
+            const kLookaheadTime = 0.05;
+            let otherParticlePosition = otherParticleState.position + otherParticleVelocity * kLookaheadTime;
+            let deltaPosition = state.position - otherParticlePosition;
+            let distance = length(deltaPosition);
+            if (isSeparationEnabled)
+            {
+                if (distance < separationDistanceThreshold)
+                {
+                    var separationForceAttenuation = saturate(1.0 - distance / separationDistanceThreshold);
+                    separationForceAttenuation = pow(separationForceAttenuation, separationFalloffExponent);
+                    let separationForceDirection = SafeNormalize(deltaPosition);
+                    accumulatedForce += separationForceDirection 
+                                        * separationForceStrength
+                                        * separationForceAttenuation;
+                }
+            }
+        }
+    }
+
+
+    (*state).velocity += accumulatedForce * dt;
+}
+
 fn ApplyParticleMotion_MouseInteraction(state : ptr<function, ParticleState>, dt: f32)
 {
     let mousePosition = _Uniforms._MousePosition.xy;
@@ -939,7 +1071,6 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
 
     let particleSlotID = _ActiveDynamicParticleSlotIndexBuffer_R[globalId.x];
     var particleState = ReadPrevParticleState(particleSlotID);
-    let particleActivateState = ReadPrevParticleActivateState(particleSlotID);
     let deltaTime = min(0.05, _Uniforms._DeltaTime);
 
     if (IsParticleEnteredDeadZone(particleState.position))
@@ -951,6 +1082,7 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     ApplyParticleMotion_DistanceField(&particleState, deltaTime, &maxSpeed);
     ApplyParticleMotion_ForceByColor(&particleState, deltaTime);
     ApplyParticleMotion_MouseInteraction(&particleState, deltaTime);
+    ApplyParticleMotion_InterParticleForces(particleSlotID, &particleState, deltaTime);
     var newVelocity = particleState.velocity;
     ClampParticleSpeed(&newVelocity, maxSpeed);
 
@@ -975,7 +1107,6 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
     particleState.color = newColor;
 
     WriteParticleState(particleSlotID, particleState);
-    WriteParticleActivateState(particleSlotID, particleActivateState);
 
     var indexInActiveParticleSlotIndexBuffer = IncrementDynamicParticleCount();
     _ActiveDynamicParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
@@ -992,15 +1123,14 @@ fn UpdateStaticParticles_ConvertPreDynamic(@builtin(global_invocation_id) global
 
     let particleSlotID = _ActiveStaticParticleSlotIndexBuffer_R[globalId.x];
     var particleState = ReadPrevParticleState(particleSlotID);
-    var particleActivateState = ReadPrevParticleActivateState(particleSlotID);
     let deltaTime = min(0.05, _Uniforms._DeltaTime);
 
-    if (particleActivateState != PARTICLE_ACTIVATE_STATE_PRE_DYNAMIC)
+    if (particleState.activateState != PARTICLE_ACTIVATE_STATE_PRE_DYNAMIC)
     {
         return;
     }
     
-    particleActivateState = PARTICLE_ACTIVATE_STATE_DYNAMIC;
+    particleState.activateState = PARTICLE_ACTIVATE_STATE_DYNAMIC;
     // Initialize Velocity Here
     var randomVel = RandomDirection(particleSlotID);
     let initialSpeed = _Uniforms._DynamicParticleSpeedParams.x;
@@ -1010,7 +1140,6 @@ fn UpdateStaticParticles_ConvertPreDynamic(@builtin(global_invocation_id) global
     var indexInActiveParticleSlotIndexBuffer = IncrementDynamicParticleCount();
     _ActiveDynamicParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
     WriteParticleState(particleSlotID, particleState);
-    WriteParticleActivateState(particleSlotID, particleActivateState);
 }
 
 
@@ -1024,9 +1153,8 @@ fn UpdateStaticParticles_CollectStatic(@builtin(global_invocation_id) globalId: 
 
     let particleSlotID = _ActiveStaticParticleSlotIndexBuffer_R[globalId.x];
     var particleState = ReadPrevParticleState(particleSlotID);
-    var particleActivateState = ReadPrevParticleActivateState(particleSlotID);
 
-    if (particleActivateState != PARTICLE_ACTIVATE_STATE_STATIC)
+    if (particleState.activateState != PARTICLE_ACTIVATE_STATE_STATIC)
     {
         return;
     }
@@ -1034,7 +1162,6 @@ fn UpdateStaticParticles_CollectStatic(@builtin(global_invocation_id) globalId: 
     var indexInActiveParticleSlotIndexBuffer = IncrementStaticParticleCount();
     _ActiveStaticParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
     WriteParticleState(particleSlotID, particleState);
-    WriteParticleActivateState(particleSlotID, particleActivateState);
 }
 
 

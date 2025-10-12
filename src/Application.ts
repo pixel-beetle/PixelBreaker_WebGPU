@@ -12,8 +12,7 @@ const kRenderTargetResolutionOptionsList =
     '480p' : '480p',
     '720p' : '720p',
     '1080p' : '1080p',
-    '2K' : '2K',
-    '4K' : '4K'
+    '2K' : '2K'
 };
 
 const kRenderTargetResolutionOptions: Record<string, number[]> = 
