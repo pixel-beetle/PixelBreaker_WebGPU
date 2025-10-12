@@ -194,21 +194,35 @@ export class PixelBreakerParticlesParams
 
 
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces", bindingParams: { label: "Enable", type: 'boolean' } })
-    public useInterParticleForces : boolean = false;
+    public useInterParticleForces : boolean = true;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces", bindingParams: { label: "Particle Radius", min: 1, max: 64, step: 1 } })
-    public interParticleForcesParticleRadius : number = 2;
+    public interParticleForcesParticleRadius : number = 4;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces", bindingParams: { label: "Max Iterations", min: 1, max: 512, step: 1, format: (value: number) => { return value.toFixed(); } } })
     public interParticleForcesMaxIterationCount : number = 256;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces", bindingParams: { label: "Max Neighbor Checks Per Cell", min: 1, max: 256, step: 1, format: (value: number) => { return value.toFixed(); } } })
-    public interParticleForcesMaxCheckedParticleCountPerCell : number = 4;
+    public interParticleForcesMaxCheckedParticleCountPerCell : number = 8;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Separation", bindingParams: { label: "Enable", type: 'boolean' } })
     public useSeparationForce : boolean = true;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Separation", bindingParams: { label: "Strength" } })
-    public separationStrength : number = 100;
+    public separationStrength : number = 50;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Separation", bindingParams: { label: "Distance" } })
     public separationDistanceThreshold : number = 4;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Separation", bindingParams: { label: "Falloff Exponent" } })
     public separationFalloffExponent : number = 1.0;
+
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Alignment", bindingParams: { label: "Enable", type: 'boolean' } })
+    public useAlignmentForce : boolean = true;
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Alignment", bindingParams: { label: "Strength" } })
+    public alignmentStrength : number = 50;
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Alignment", bindingParams: { label: "Distance" } })
+    public alignmentDistanceThreshold : number = 16;
+
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Cohesion", bindingParams: { label: "Enable", type: 'boolean' } })
+    public useCohesionForce : boolean = true;
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Cohesion", bindingParams: { label: "Strength" } })
+    public cohesionStrength : number = 10;
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Cohesion", bindingParams: { label: "Distance" } })
+    public cohesionDistanceThreshold : number = 16;
 
     @UIBinding({containerPath: "#T/%Render/@Size", bindingParams: { label: "Render Size", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
     public dynamicParticleSize: number = 1;
@@ -291,6 +305,24 @@ export class PixelBreakerParticlesParams
                 break;
             case "separationFalloffExponent":
                 this.separationFalloffExponent = value;
+                break;
+            case "useAlignmentForce":
+                this.useAlignmentForce = value;
+                break;
+            case "alignmentStrength":
+                this.alignmentStrength = value;
+                break;
+            case "alignmentDistanceThreshold":
+                this.alignmentDistanceThreshold = value;
+                break;
+            case "useCohesionForce":
+                this.useCohesionForce = value;
+                break;
+            case "cohesionStrength":
+                this.cohesionStrength = value;
+                break;
+            case "cohesionDistanceThreshold":
+                this.cohesionDistanceThreshold = value;
                 break;
             case "dynamicParticleInitialSpeed":
                 this.dynamicParticleInitialSpeed = value;
@@ -813,6 +845,20 @@ export class PixelBreakerManager
             this.params.separationFalloffExponent
         );
         this._computeUBO.updateVector4("_InterParticleForceParams_Separation", separationParams);
+        let alignmentParams = new BABYLON.Vector4(
+            this.params.useAlignmentForce ? 1 : 0,
+            this.params.alignmentStrength * forceScaleFactor,
+            this.params.alignmentDistanceThreshold * particleSizeScaleFactor,
+            0.0
+        );
+        this._computeUBO.updateVector4("_InterParticleForceParams_Alignment", alignmentParams);
+        let cohesionParams = new BABYLON.Vector4(
+            this.params.useCohesionForce ? 1 : 0,
+            this.params.cohesionStrength * forceScaleFactor,
+            this.params.cohesionDistanceThreshold * particleSizeScaleFactor,
+            0.0
+        );
+        this._computeUBO.updateVector4("_InterParticleForceParams_Cohesion", cohesionParams);
     }
 
     private UpdateComputeUBO_Coloring(speedScaleFactor: number, forceScaleFactor: number)

@@ -205,6 +205,16 @@ struct Uniforms
     // z: distance
     // w: falloff exponent
     _InterParticleForceParams_Separation: vec4<f32>,
+
+    // x: enable
+    // y: strength
+    // z: distance
+    _InterParticleForceParams_Alignment: vec4<f32>,
+
+    // x: enable
+    // y: strength
+    // z: distance
+    _InterParticleForceParams_Cohesion: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> _Uniforms: Uniforms;
@@ -941,7 +951,8 @@ fn ApplyParticleMotion_InterParticleForces( selfParticleSlotID: u32, state : ptr
         return;
     }
     let isSeparationEnabled = _Uniforms._InterParticleForceParams_Separation.x > 0.5;
-
+    let isAlignmentEnabled = _Uniforms._InterParticleForceParams_Alignment.x > 0.5;
+    let isCohesionEnabled = _Uniforms._InterParticleForceParams_Cohesion.x > 0.5;
 
     let MAX_ITERATION_COUNT = u32(_Uniforms._InterParticleForceParams_Base.w);
     let MAX_CHECKED_PARTICLE_COUNT = u32(_Uniforms._InterParticleForceParams_Base.z);
@@ -955,8 +966,18 @@ fn ApplyParticleMotion_InterParticleForces( selfParticleSlotID: u32, state : ptr
     let separationDistanceThreshold = _Uniforms._InterParticleForceParams_Separation.z;
     let separationFalloffExponent = _Uniforms._InterParticleForceParams_Separation.w;
 
+    let alignmentForceStrength = _Uniforms._InterParticleForceParams_Alignment.y;
+    let alignmentDistanceThreshold = _Uniforms._InterParticleForceParams_Alignment.z;
+
+    let cohesionForceStrength = _Uniforms._InterParticleForceParams_Cohesion.y;
+    let cohesionDistanceThreshold = _Uniforms._InterParticleForceParams_Cohesion.z;
+
     var accumulatedForce = vec2<f32>(0.0, 0.0);
+    var accumulatedAlignmentDirection = vec2<f32>(0.0, 0.0);
+    var accumulatedCohesion = vec2<f32>(0.0, 0.0);
     var totalIterationCount = 0u;
+    var totalValidAlignmentNeighborCount = 0u;
+    var totalValidCohesionNeighborCount = 0u;
 
     for (var i = 0; i < 9; i++)
     {
@@ -964,7 +985,7 @@ fn ApplyParticleMotion_InterParticleForces( selfParticleSlotID: u32, state : ptr
         let gridOffset = GridOffsetArray[gridOffsetIndex];
         let otherGridCoord = vec2<i32>(selfGridCoord.x + gridOffset.x, 
                                        selfGridCoord.y + gridOffset.y);
-                                       
+
         let otherGridHashKey = SHT_GetGridHash_2D(otherGridCoord) % _Uniforms._SHT_TableEntryCount;
         var currentLinkedListNodeIndex = _SHT_TableEntryBuffer_R[otherGridHashKey];
         if (currentLinkedListNodeIndex == UINT_MAX)
@@ -1017,9 +1038,37 @@ fn ApplyParticleMotion_InterParticleForces( selfParticleSlotID: u32, state : ptr
                                         * separationForceAttenuation;
                 }
             }
+            if (isAlignmentEnabled)
+            {
+                if (distance < alignmentDistanceThreshold)
+                {
+                    accumulatedAlignmentDirection += SafeNormalize(otherParticleVelocity);
+                }
+                totalValidAlignmentNeighborCount++;
+            }
+            if (isCohesionEnabled)
+            {
+                if (distance < cohesionDistanceThreshold)
+                {
+                    accumulatedCohesion += otherParticlePosition;
+                }
+                totalValidCohesionNeighborCount++;
+            }
         }
     }
 
+    if (isAlignmentEnabled && totalValidAlignmentNeighborCount > 0)
+    {
+        accumulatedAlignmentDirection = SafeNormalize(accumulatedAlignmentDirection / f32(totalValidAlignmentNeighborCount));
+        (*state).velocity += accumulatedAlignmentDirection * alignmentForceStrength * dt;
+    }
+
+    if (isCohesionEnabled && totalValidCohesionNeighborCount > 0)
+    {
+        accumulatedCohesion = (accumulatedCohesion / f32(totalValidCohesionNeighborCount));
+        accumulatedCohesion = SafeNormalize(accumulatedCohesion - state.position);
+        (*state).velocity += accumulatedCohesion * cohesionForceStrength * dt;
+    }
 
     (*state).velocity += accumulatedForce * dt;
 }
