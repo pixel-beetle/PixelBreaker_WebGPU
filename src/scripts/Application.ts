@@ -1,10 +1,12 @@
 import * as BABYLON from 'babylonjs';
-import { SceneManager } from './scripts/Core/SceneManager';
-import { VideoManager } from './scripts/Core/VideoManager';
-import { ReflectedInspector } from './scripts/GUI/ReflectedInspector';
-import JumpFloodingSDFGenerator from './scripts/Core/JumpFloodingSDFGenerator';
-import { PixelBreakerManager } from './scripts/Core/PixelBreakerManager';
-import { UIBinding } from './scripts/GUI/UIProperty';
+import { SceneManager } from './Core/SceneManager';
+import { VideoManager } from './Core/VideoManager';
+import { ReflectedInspector } from './GUI/ReflectedInspector';
+import JumpFloodingSDFGenerator from './Core/JumpFloodingSDFGenerator';
+import { PixelBreakerManager } from './Core/PixelBreakerManager';
+import { UIBinding, UIButton } from './GUI/UIProperty';
+import { Gradient } from 'tweakpane-plugin-gradient';
+import { GameSaveDataManager } from './Core/GameSaveDataManager';
 
 const kRenderTargetResolutionOptionsList = 
 {
@@ -30,9 +32,13 @@ const kTabPagePath_Interaction = "#RootTab/%Interaction";
 const kTabPagePath_Particles = "#RootTab/%Particles";
 const kFolderPath_Debug = kTabPagePath_General + "/@Debug";
 const kFolderPath_Application = kTabPagePath_General + "/@Application";
+const kFolderPath_SaveLoad = kTabPagePath_General + "/@Save Load";
 
 export class Application 
 {
+    @UIButton({ category: "Save Load", buttonParams: { title: "Create Share Link" } })
+    private _createShareLink: any = null;
+
     @UIBinding({ category: "Application", bindingParams: { label: "Render Target Resolution", options: kRenderTargetResolutionOptionsList } })
     private _renderTargetResolutionOption: string = '1080p';
 
@@ -45,6 +51,7 @@ export class Application
     private _inspector!: ReflectedInspector;
     private _jumpFloodingSDFGenerator!: JumpFloodingSDFGenerator;
     private _pixelBreakerManager!: PixelBreakerManager;
+    private _gameSaveDataManager!: GameSaveDataManager;
 
     private _isFirstInteractionGot: boolean = false;
     private _isPaused: boolean = true;
@@ -76,7 +83,7 @@ export class Application
         this._videoManager = new VideoManager(this._sceneManager.scene);
         this._jumpFloodingSDFGenerator = new JumpFloodingSDFGenerator();
         this._pixelBreakerManager = new PixelBreakerManager();
-
+        this._gameSaveDataManager = new GameSaveDataManager();
         this.RegisterUITargets();
 
         this._inspector.pane.addBlade({
@@ -91,6 +98,27 @@ export class Application
         videoParentNode.appendChild(this._controlHintElement);
 
         this._inspector.pane.hidden = true;
+
+        this._gameSaveDataManager.InitialLoad();
+    }
+
+    private CreateShareLinkForCurrentSettings(): void
+    {
+        let data = this._gameSaveDataManager.ExportSaveDataFromInspectorTree(this._inspector.tree!);
+        console.log(data);
+        let link = this._gameSaveDataManager.GenerateShareLink(data);
+        console.log(link);
+        // copy to clipboard
+        navigator.clipboard.writeText(link);
+        alert('Share link copied to clipboard');
+        return;
+    }
+
+    private LoadExportedSettingsFromURLIfPossible(): void
+    {
+        let data = this._gameSaveDataManager.LoadFromCurrentURLLocation();
+        console.log(data);
+        this._gameSaveDataManager.ImportSaveDataToInspectorTree(this._inspector.tree!, data);
     }
 
     private RegisterUITargets(): void
@@ -101,6 +129,9 @@ export class Application
                 case '_renderTargetResolutionOption':
                     this._renderTargetWidth = kRenderTargetResolutionOptions[value][0];
                     this._renderTargetHeight = kRenderTargetResolutionOptions[value][1];
+                    break;
+                case '_createShareLink':
+                    this.CreateShareLinkForCurrentSettings();
                     break;
             }
         });
@@ -142,6 +173,8 @@ export class Application
         this._inspector.BuildUIComponents();
 
         const applicationFolder = this._inspector.tree!.GetFolder(kFolderPath_Application)!;
+        const saveLoadFolder = this._inspector.tree!.GetFolder(kFolderPath_SaveLoad)!;
+
         const playPauseButtonGrid : any = applicationFolder.addBlade({
             view: 'buttongrid',
             size: [2, 1],
@@ -461,6 +494,12 @@ export class Application
             if (!this._isFirstInteractionGot)
             {
                 return;
+            }
+
+            if (!this._gameSaveDataManager.isInitialLoadedDataUsed)
+            {
+                let data = this._gameSaveDataManager.ConsumeInitialLoadedData();
+                this._gameSaveDataManager.ImportSaveDataToInspectorTree(this._inspector.tree!, data);
             }
 
             this._fpsGraph!.begin();

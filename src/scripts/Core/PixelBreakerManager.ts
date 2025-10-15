@@ -462,9 +462,32 @@ export class PixelBreakerManager
     public mouseInteractionParams: PixelBreakerMouseInteractionParams = new PixelBreakerMouseInteractionParams();
     public particleCountReadback: ParticleCountReadbackBuffer = new ParticleCountReadbackBuffer();
 
-    public particleSpawnColorGradientTexture: GradientTexture | null = null;
-    public particleColorBySpeedGradientTexture: GradientTexture | null = null;
-    
+    private _particleSpawnColorGradientTexture: GradientTexture | null = null;
+    private _particleColorBySpeedGradientTexture: GradientTexture | null = null;
+    public get particleSpawnColorGradientTexture(): GradientTexture
+    {
+        if (!this._particleSpawnColorGradientTexture)
+        {
+            this._particleSpawnColorGradientTexture = new GradientTexture(256, this._scene!);
+        }
+        return this._particleSpawnColorGradientTexture;
+    }
+    public set particleSpawnColorGradientTexture(value: GradientTexture)
+    {
+        this._particleSpawnColorGradientTexture = value;
+    }
+    public get particleColorBySpeedGradientTexture(): GradientTexture
+    {
+        if (!this._particleColorBySpeedGradientTexture)
+        {
+            this._particleColorBySpeedGradientTexture = new GradientTexture(256, this._scene!);
+        }
+        return this._particleColorBySpeedGradientTexture;
+    }
+    public set particleColorBySpeedGradientTexture(value: GradientTexture)
+    {
+        this._particleColorBySpeedGradientTexture = value;
+    }
     // Private States
     private _renderTargetSizeInfo: RenderTargetSizeInfo = new RenderTargetSizeInfo();
     private _staticParticleSpawnRectMin: BABYLON.Vector2 = new BABYLON.Vector2(-1, -1);
@@ -654,17 +677,9 @@ export class PixelBreakerManager
             this._renderMaterial = material;
         }
 
-        if (!this.particleSpawnColorGradientTexture)
-        {
-            this.particleSpawnColorGradientTexture = new GradientTexture(256, this._scene!);
-            this.particleSpawnColorGradientTexture.UpdateFromTPGradient(this.params.particleSpawnColorGradient);
-        }
 
-        if (!this.particleColorBySpeedGradientTexture)
-        {
-            this.particleColorBySpeedGradientTexture = new GradientTexture(256, this._scene!);
-            this.particleColorBySpeedGradientTexture.UpdateFromTPGradient(this.params.particleColorBySpeedGradient);
-        }
+        this.particleSpawnColorGradientTexture.UpdateFromTPGradient(this.params.particleSpawnColorGradient);
+        this.particleColorBySpeedGradientTexture.UpdateFromTPGradient(this.params.particleColorBySpeedGradient);
 
         return true;
     }
@@ -701,8 +716,8 @@ export class PixelBreakerManager
                 this.particleSpawnColorGradientTexture.Release();
             if (this.particleColorBySpeedGradientTexture)
                 this.particleColorBySpeedGradientTexture.Release();
-            this.particleSpawnColorGradientTexture = null;
-            this.particleColorBySpeedGradientTexture = null;
+            this._particleSpawnColorGradientTexture = null;
+            this._particleColorBySpeedGradientTexture = null;
         }
 
         if (this._gpuSpatialHashTable)

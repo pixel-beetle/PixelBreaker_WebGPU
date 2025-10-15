@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { Application as App } from './Application';
+import { Application as App } from './scripts/Application';
 
 console.log(`main.ts starting ${App.name}`);
 window.addEventListener('DOMContentLoaded', async () => {

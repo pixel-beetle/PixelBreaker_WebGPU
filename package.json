@@ -20,6 +20,7 @@
     "@babylonjs/core": "^8.30.2",
     "@types/reflect-metadata": "^0.0.5",
     "babylonjs": "^8.30.2",
+    "lz-string": "^1.5.0",
     "reflect-metadata": "^0.2.2",
     "tweakpane": "^4.0.5",
     "tweakpane-plugin-gradient": "^0.1.5",

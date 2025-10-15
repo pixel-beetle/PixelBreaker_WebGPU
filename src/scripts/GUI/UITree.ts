@@ -295,6 +295,7 @@ export class UILeafNode extends UINode
                             onPropertyChange(propertyKey, true);
                         }
                     });
+                    this.uiComponent = button;
                     break;
                 case 'gradient':
                     let kGradientParams: GradientBladeParams = {
@@ -330,7 +331,7 @@ export class UILeafNode extends UINode
                             onPropertyChange(propertyKey, ev.value);
                         }
                     });
-
+                    this.uiComponent = gradientUI;
                     const onClickGradientPasteButton = (ev: any) => 
                     {
                             navigator.clipboard.readText().then(
@@ -359,7 +360,6 @@ export class UILeafNode extends UINode
                         title: 'colors.co URL',
                     }) as any;
                     gradientPasteButtonB.on('click', onClickGradientPasteButton);
-                
                     break;
                 default:
                     const bindingOptions = options as BindingOptions;
@@ -370,6 +370,7 @@ export class UILeafNode extends UINode
                             onPropertyChange(propertyKey, ev.value);
                         });
                     }
+                    this.uiComponent = control;
                     break;
             }
         } 

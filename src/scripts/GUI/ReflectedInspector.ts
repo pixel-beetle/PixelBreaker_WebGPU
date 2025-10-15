@@ -17,6 +17,11 @@ export interface ReflectedInspectorOptions
 export class ReflectedInspector 
 {
     private _targets: Set<any> = new Set();
+    public get targets(): Set<any>
+    {
+        return this._targets;
+    }
+    
     private _refreshTimer?: number;
     private _options: ReflectedInspectorOptions;
 
