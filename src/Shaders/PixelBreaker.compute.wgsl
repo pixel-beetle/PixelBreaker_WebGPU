@@ -181,6 +181,7 @@ struct Uniforms
     _ReflectionBoardRectMinMax: vec4<f32>,
     _ReflectionBoardColor: vec4<f32>,
     
+    _DistanceFieldCollisionUseHardConstraint: f32,
     _DistanceFieldForceParams: vec4<f32>,
     _ForceByColorParams: vec4<f32>,
 
@@ -898,12 +899,36 @@ fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f
         (*state).velocity += dfTangent * swirlStrength * dt;
         
         *maxSpeed = min(*maxSpeed * mix(1.5, 3.5, pow(df, 0.3)), 8000.0);
+
+        let kMaxPushIterationCount = u32(128 * _Uniforms._DistanceFieldCollisionUseHardConstraint);
+        var pushIterationCount = 0u;
+        var currentDistanceToSurface = sdf;
+        var currentDfGradient = dfGradient;
+        let enableHardConstraint = _Uniforms._DistanceFieldCollisionUseHardConstraint > 0.00001;
+        while (enableHardConstraint && pushIterationCount < kMaxPushIterationCount)
+        {
+            if (currentDistanceToSurface > 0.00001)
+            {
+                break;
+            }
+            let pushDistance = abs(currentDistanceToSurface) * _Uniforms._RenderTargetTexelSize.z;
+            let hardConstraintNewPosition = (*state).position + currentDfGradient * pushDistance;
+            (*state).position = hardConstraintNewPosition;
+            pushIterationCount++;
+            let sampledDFTexture = SampleDistanceFieldTexture((*state).position);
+            currentDistanceToSurface = sampledDFTexture.z * 2.0 - 1.0;
+            currentDistanceToSurface = currentDistanceToSurface;
+            currentDfGradient = SafeNormalize(sampledDFTexture.xy * 2.0 - 1.0);
+        }
     }
     else
     {
-        if(df < 0.001)
+        if(df < 0.0001)
         {
             (*state).velocity = reflect((*state).velocity, dfGradient);
+            let pushDistance = (df + 0.01) * _Uniforms._RenderTargetTexelSize.z;
+            let hardConstraintNewPosition = (*state).position + dfGradient * pushDistance;
+            (*state).position = mix((*state).position, hardConstraintNewPosition, _Uniforms._DistanceFieldCollisionUseHardConstraint);
         }
         else
         {

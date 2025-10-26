@@ -170,6 +170,10 @@ export class PixelBreakerParticlesParams
 
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@SDF Force", bindingParams: { label: "Enable", type: 'boolean' } })
     public useDistanceFieldForce : boolean = true;
+
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force/@SDF Force", bindingParams: { label: "Use Hard Constraint", min: 0, max: 1, step: 0.01 } })
+    public distanceFieldCollisionUseHardConstraint: number = 0.0;
+
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@SDF Force", bindingParams: { label: "Collision Strength" } })
     public distanceFieldCollisionStrength : number = 150;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@SDF Force", bindingParams: { label: "Swirl Strength(Outside)" } })
@@ -217,7 +221,7 @@ export class PixelBreakerParticlesParams
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Cohesion", bindingParams: { label: "Enable", type: 'boolean' } })
     public useCohesionForce : boolean = true;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Cohesion", bindingParams: { label: "Strength" } })
-    public cohesionStrength : number = 10;
+    public cohesionStrength : number = 25;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Cohesion", bindingParams: { label: "Distance" } })
     public cohesionDistanceThreshold : number = 16;
 
@@ -269,6 +273,9 @@ export class PixelBreakerParticlesParams
                 break;
             case "useDistanceFieldForce":
                 this.useDistanceFieldForce = value;
+                break;
+            case "distanceFieldCollisionUseHardConstraint":
+                this.distanceFieldCollisionUseHardConstraint = value;
                 break;
             case "distanceFieldCollisionStrength":
                 this.distanceFieldCollisionStrength = value;
@@ -819,6 +826,7 @@ export class PixelBreakerManager
             this.params.distanceFieldSwirlStrength * forceScaleFactor, 
             this.params.distanceFieldInsideSwirlStrength * forceScaleFactor);
         this._computeUBO.updateVector4("_DistanceFieldForceParams", distanceFieldForceParams);
+        this._computeUBO.updateFloat("_DistanceFieldCollisionUseHardConstraint", this.params.distanceFieldCollisionUseHardConstraint);
     }
 
     private UpdateComputeUBO_MouseInteraction(forceScaleFactor: number, distanceScaleFactor: number)
