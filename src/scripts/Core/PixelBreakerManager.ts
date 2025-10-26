@@ -379,6 +379,9 @@ export class PixelBreakerParticlesParams
 
 export class PixelBreakerMouseInteractionParams
 {
+    @UIBinding({bindingParams: { label: "Hint Gizmo Thickness", min: 0, max: 5, step: 0.001 } })
+    public hintGizmoThickness : number = 0.0;
+
     @UIBinding({bindingParams: { label: "Radius", min: 0, max: 0.5, step: 0.01 } })
     public radius: number = 0.15;
     
@@ -435,6 +438,9 @@ export class PixelBreakerMouseInteractionParams
     {
         switch (property) 
         {
+            case "hintGizmoThickness":
+                this.hintGizmoThickness = value;
+                break;
             case "radius":
                 this.radius = value;
                 break;
@@ -556,6 +562,7 @@ export class PixelBreakerManager
             this._renderUBO.addUniform("_ReflectionBoardColor", 4);
             this._renderUBO.addUniform("_MousePosition", 4);
             this._renderUBO.addUniform("_MouseInteractionParams", 4);
+            this._renderUBO.addUniform("_MouseInteractionHintGizmoThickness", 1);
             this._renderUBO.create();
         }
         
@@ -962,6 +969,7 @@ export class PixelBreakerManager
         const mouseState = this.mouseInteractionParams.GetMouseStateUniforms();
         this._renderUBO.updateVector4("_MousePosition", mouseState);
         this._renderUBO.updateVector4("_MouseInteractionParams", mouseInteractionParams);
+        this._renderUBO.updateFloat("_MouseInteractionHintGizmoThickness", this.mouseInteractionParams.hintGizmoThickness);
 
         this._renderUBO.update();
     }

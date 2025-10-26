@@ -4,7 +4,8 @@ struct Uniforms
     _ReflectionBoardRectMinMax: vec4<f32>,
     _ReflectionBoardColor: vec4<f32>,
     _MousePosition: vec4<f32>, // xy: pos, z:is pressed, w: button
-    _MouseInteractionParams: vec4<f32> // x: radius, y: radial strength, z: swirl strength, w: falloff exponent
+    _MouseInteractionParams: vec4<f32>, // x: radius, y: radial strength, z: swirl strength, w: falloff exponent
+    _MouseInteractionHintGizmoThickness: f32
 }
 
 var<uniform> _Uniforms: Uniforms;
@@ -27,7 +28,9 @@ fn DrawMouseInteractionHint(pixelCoord: vec2<u32>, texelSize: vec4<f32>) -> vec4
     let circleRadius = _Uniforms._MouseInteractionParams.x;
     let distanceToCenter = length(vec2<f32>(f32(pixelCoord.x), f32(pixelCoord.y)) - circleCenter);
     let distanceToEdge = abs(distanceToCenter - circleRadius);
-    let circleEdge = 1.0 - smoothstep(1.5, 2.0, distanceToEdge);
+    let hintGizmoThickness = _Uniforms._MouseInteractionHintGizmoThickness;
+    var circleEdge = 1.0 - smoothstep(hintGizmoThickness, hintGizmoThickness + 0.5, distanceToEdge);
+    circleEdge = select(circleEdge, 0.0, hintGizmoThickness < 0.0001);
 
     let button = i32(_Uniforms._MousePosition.w);
     let isButtonPressed = button >= 0;
