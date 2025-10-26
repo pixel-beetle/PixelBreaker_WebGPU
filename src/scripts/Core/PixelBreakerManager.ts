@@ -161,14 +161,11 @@ export class PixelBreakerParticlesParams
     @UIBinding({containerPath: "#T/%Spawn/@Color", bindingParams: { label: "Particle Color Tint", color : { type: 'float' } } } )
     public particleColorTint: BABYLON.Color4 = new BABYLON.Color4(1.0, 1.0, 1.0, 1.0);
 
+    @UIBinding({containerPath: "#T/%Update/#TT/%Speed", bindingParams: { label: "Min Speed", min:0 } })
+    public dynamicParticleMinSpeed: number = 16;
+    
     @UIBinding({containerPath: "#T/%Update/#TT/%Speed", bindingParams: { label: "Max Speed", min:0 } })
-    public dynamicParticleMaxSpeed: number = 18;
-
-    @UIBinding({containerPath: "#T/%Update/#TT/%Speed", bindingParams: { label: "Use Fixed Speed", min:0 } })
-    public dynamicParticleUseFixedSpeed : boolean = false;
-
-    @UIBinding({containerPath: "#T/%Update/#TT/%Speed", bindingParams: { label: "Fixed Speed", min:0 } })
-    public dynamicParticleFixedSpeed : number = 10;
+    public dynamicParticleMaxSpeed: number = 20;
 
 
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@SDF Force", bindingParams: { label: "Enable", type: 'boolean' } })
@@ -213,9 +210,9 @@ export class PixelBreakerParticlesParams
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Alignment", bindingParams: { label: "Enable", type: 'boolean' } })
     public useAlignmentForce : boolean = true;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Alignment", bindingParams: { label: "Strength" } })
-    public alignmentStrength : number = 50;
+    public alignmentStrength : number = 20;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Alignment", bindingParams: { label: "Distance" } })
-    public alignmentDistanceThreshold : number = 16;
+    public alignmentDistanceThreshold : number = 8;
 
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Cohesion", bindingParams: { label: "Enable", type: 'boolean' } })
     public useCohesionForce : boolean = true;
@@ -330,11 +327,8 @@ export class PixelBreakerParticlesParams
             case "dynamicParticleMaxSpeed":
                 this.dynamicParticleMaxSpeed = value;
                 break;
-            case "dynamicParticleUseFixedSpeed":
-                this.dynamicParticleUseFixedSpeed = value;
-                break;
-            case "dynamicParticleFixedSpeed":
-                this.dynamicParticleFixedSpeed = value;
+            case "dynamicParticleMinSpeed":
+                this.dynamicParticleMinSpeed = value;
                 break;
             case "dynamicParticleSize":
                 this.dynamicParticleSize = value;
@@ -768,9 +762,9 @@ export class PixelBreakerManager
 
         const dynamicParticleSpeedParams = new BABYLON.Vector4(
             this.params.dynamicParticleInitialSpeed * speedScaleFactor, 
+            this.params.dynamicParticleMinSpeed * speedScaleFactor, 
             this.params.dynamicParticleMaxSpeed * speedScaleFactor, 
-            this.params.dynamicParticleUseFixedSpeed ? 1 : 0, 
-            this.params.dynamicParticleFixedSpeed * speedScaleFactor
+            0.0
         );
 
         this._computeUBO.updateVector4("_DynamicParticleSpeedParams", dynamicParticleSpeedParams);

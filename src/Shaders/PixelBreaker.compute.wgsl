@@ -172,6 +172,7 @@ struct Uniforms
 
     _ParticleColorTint: vec4<f32>,
     
+    // x: initial speed, y: min speed, z: max speed, w: unused
     _DynamicParticleSpeedParams: vec4<f32>,
     _DynamicParticleSize: f32,
     
@@ -842,18 +843,13 @@ fn IsParticleCollidingStaticParticle(position: vec2<f32>, velocity: vec2<f32>,
 
 fn ClampParticleSpeed(velocity: ptr<function, vec2<f32>>, maxSpeed: f32)
 {
-    let useFixedSpeed = _Uniforms._DynamicParticleSpeedParams.z > 0.5;
-    let fixedSpeed = _Uniforms._DynamicParticleSpeedParams.w;
+    let minSpeed = _Uniforms._DynamicParticleSpeedParams.y;
+    let maxSpeedUniform = _Uniforms._DynamicParticleSpeedParams.z;
+    let combinedMaxSpeed = max(minSpeed, maxSpeedUniform);
     let speed = length(*velocity);
     let direction = SafeNormalize(*velocity);
-    if (useFixedSpeed)
-    {
-        *velocity = direction * fixedSpeed;
-    }
-    else
-    {
-        *velocity = direction * min(speed, maxSpeed);
-    }
+    let newSpeed = clamp(speed, minSpeed, combinedMaxSpeed);
+    *velocity = direction * newSpeed;
 }
 
 fn SampleDistanceFieldTexture(statePosition: vec2<f32>) -> vec4<f32>
