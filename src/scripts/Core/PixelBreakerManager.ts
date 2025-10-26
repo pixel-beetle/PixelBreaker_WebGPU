@@ -162,10 +162,10 @@ export class PixelBreakerParticlesParams
     public particleColorTint: BABYLON.Color4 = new BABYLON.Color4(1.0, 1.0, 1.0, 1.0);
 
     @UIBinding({containerPath: "#T/%Update/#TT/%Speed", bindingParams: { label: "Min Speed", min:0 } })
-    public dynamicParticleMinSpeed: number = 16;
+    public dynamicParticleMinSpeed: number = 12;
     
     @UIBinding({containerPath: "#T/%Update/#TT/%Speed", bindingParams: { label: "Max Speed", min:0 } })
-    public dynamicParticleMaxSpeed: number = 20;
+    public dynamicParticleMaxSpeed: number = 26;
 
 
     @UIBinding({containerPath: "#T/%Update/#TT/%Force", bindingParams: { label: "Directional Force", x: {  step: 0.01 }, y: { step: 0.01 } } })
@@ -208,7 +208,7 @@ export class PixelBreakerParticlesParams
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Separation", bindingParams: { label: "Enable", type: 'boolean' } })
     public useSeparationForce : boolean = true;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Separation", bindingParams: { label: "Strength" } })
-    public separationStrength : number = 50;
+    public separationStrength : number = 75;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Separation", bindingParams: { label: "Distance" } })
     public separationDistanceThreshold : number = 4;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Separation", bindingParams: { label: "Falloff Exponent" } })
@@ -217,14 +217,14 @@ export class PixelBreakerParticlesParams
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Alignment", bindingParams: { label: "Enable", type: 'boolean' } })
     public useAlignmentForce : boolean = true;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Alignment", bindingParams: { label: "Strength" } })
-    public alignmentStrength : number = 20;
+    public alignmentStrength : number = 25;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Alignment", bindingParams: { label: "Distance" } })
     public alignmentDistanceThreshold : number = 8;
 
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Cohesion", bindingParams: { label: "Enable", type: 'boolean' } })
     public useCohesionForce : boolean = true;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Cohesion", bindingParams: { label: "Strength" } })
-    public cohesionStrength : number = 25;
+    public cohesionStrength : number = 12;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Cohesion", bindingParams: { label: "Distance" } })
     public cohesionDistanceThreshold : number = 16;
 
