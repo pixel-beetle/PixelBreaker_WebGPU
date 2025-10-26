@@ -174,7 +174,7 @@ struct Uniforms
     
     // x: initial speed, y: min speed, z: max speed, w: unused
     _DynamicParticleSpeedParams: vec4<f32>,
-    _DynamicParticleSize: f32,
+    _DynamicParticleSize: vec4<f32>,
     
     _StaticParticleSpawnRectMinMax: vec4<f32>,
     
@@ -1349,7 +1349,14 @@ fn SoftwareRasterizeDynamicParticles(@builtin(global_invocation_id) globalId: ve
 
     color.a = sortingIndex;
     let packedColor = PackColor(color);
-    let particleRenderSize = i32(_Uniforms._DynamicParticleSize);
+    let renderSizeMin = _Uniforms._DynamicParticleSize.x;
+    let renderSizeMax = _Uniforms._DynamicParticleSize.y;
+    let renderSizeVariancePower = _Uniforms._DynamicParticleSize.z;
+
+    var particleSizeLerpT = pow(1.0 - particleState.color.a, renderSizeVariancePower);
+    particleSizeLerpT = saturate(particleSizeLerpT);
+    let particleRenderSizeF = mix(renderSizeMin, renderSizeMax, particleSizeLerpT);
+    let particleRenderSize = i32(particleRenderSizeF);
 
     for (var x = 0; x < particleRenderSize; x++)
     {

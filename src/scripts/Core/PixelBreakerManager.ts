@@ -228,8 +228,12 @@ export class PixelBreakerParticlesParams
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Cohesion", bindingParams: { label: "Distance" } })
     public cohesionDistanceThreshold : number = 16;
 
-    @UIBinding({containerPath: "#T/%Render/@Size", bindingParams: { label: "Render Size", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
-    public dynamicParticleSize: number = 1;
+    @UIBinding({containerPath: "#T/%Render/@Size", bindingParams: { label: "Render Size Min", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
+    public dynamicParticleSizeMin: number = 1;
+    @UIBinding({containerPath: "#T/%Render/@Size", bindingParams: { label: "Render Size Max", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
+    public dynamicParticleSizeMax: number = 1;
+    @UIBinding({containerPath: "#T/%Render/@Size", bindingParams: { label: "Render Size Variance Power" } })
+    public dynamicParticleSizeVariancePower: number = 1;
 
     @UIBinding({containerPath: "#T/%Render/@Trail", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 1.0, step: 0.001 } })
     public trailFadeRate : number = 0.6;
@@ -343,8 +347,14 @@ export class PixelBreakerParticlesParams
             case "dynamicParticleMinSpeed":
                 this.dynamicParticleMinSpeed = value;
                 break;
-            case "dynamicParticleSize":
-                this.dynamicParticleSize = value;
+            case "dynamicParticleSizeMin":
+                this.dynamicParticleSizeMin = value;
+                break;
+            case "dynamicParticleSizeMax":
+                this.dynamicParticleSizeMax = value;
+                break;
+            case "dynamicParticleSizeVariancePower":
+                this.dynamicParticleSizeVariancePower = value;
                 break;
             case "trailFadeRate":
                 this.trailFadeRate = value;
@@ -771,7 +781,14 @@ export class PixelBreakerManager
         this._computeUBO.updateVector4("_RenderTargetTexelSize", this._renderTargetSizeInfo.texelSize);
         this._computeUBO.updateUInt("_TotalParticleCapacity", this.params.dynamicParticleInitialCount + this._renderTargetSizeInfo.totalTexelCount);
         this._computeUBO.updateUInt("_DynamicParticleInitialCount", this.params.dynamicParticleInitialCount);
-        this._computeUBO.updateFloat("_DynamicParticleSize", this.params.dynamicParticleSize);
+
+        const dynamicParticleSize = new BABYLON.Vector4(
+            this.params.dynamicParticleSizeMin, 
+            this.params.dynamicParticleSizeMax, 
+            this.params.dynamicParticleSizeVariancePower, 
+            0.0
+        );
+        this._computeUBO.updateVector4("_DynamicParticleSize", dynamicParticleSize);
 
         const dynamicParticleSpeedParams = new BABYLON.Vector4(
             this.params.dynamicParticleInitialSpeed * speedScaleFactor, 
