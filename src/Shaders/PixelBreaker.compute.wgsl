@@ -905,7 +905,7 @@ fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f
         let swirlStrength = _Uniforms._DistanceFieldForceParams.w;
         (*state).velocity += dfTangent * swirlStrength * dt;
         
-        *maxSpeed = min(*maxSpeed * mix(1.5, 3.5, pow(df, 0.3)), 8000.0);
+        // *maxSpeed = min(*maxSpeed * mix(1.5, 3.5, pow(df, 0.3)), 8000.0);
 
         let kMaxPushIterationCount = u32(128 * _Uniforms._DistanceFieldCollisionUseHardConstraint);
         var pushIterationCount = 0u;

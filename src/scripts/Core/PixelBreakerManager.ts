@@ -145,7 +145,7 @@ export class PixelBreakerBoardParams
 export class PixelBreakerParticlesParams
 {
     @UIBinding({containerPath: "#T/%Spawn/@Static Particle", bindingParams: { label: "Spawn Rect Min", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
-    public staticParticleSpawnRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.2, 0.2);
+    public staticParticleSpawnRectMin01: BABYLON.Vector2 = new BABYLON.Vector2(0.2, 0.05);
     @UIBinding({containerPath: "#T/%Spawn/@Static Particle", bindingParams: { label: "Spawn Rect Max", x: { min: 0, max: 1, step: 0.01 }, y: { min: 0, max: 1, step: 0.01 } } })
     public staticParticleSpawnRectMax01: BABYLON.Vector2 = new BABYLON.Vector2(0.8, 0.99);
     
@@ -162,10 +162,10 @@ export class PixelBreakerParticlesParams
     public particleColorTint: BABYLON.Color4 = new BABYLON.Color4(1.0, 1.0, 1.0, 1.0);
 
     @UIBinding({containerPath: "#T/%Update/#TT/%Speed", bindingParams: { label: "Min Speed", min:0 } })
-    public dynamicParticleMinSpeed: number = 12;
+    public dynamicParticleMinSpeed: number = 9.5;
     
     @UIBinding({containerPath: "#T/%Update/#TT/%Speed", bindingParams: { label: "Max Speed", min:0 } })
-    public dynamicParticleMaxSpeed: number = 26;
+    public dynamicParticleMaxSpeed: number = 12.5;
 
 
     @UIBinding({containerPath: "#T/%Update/#TT/%Force", bindingParams: { label: "Directional Force", x: {  step: 0.01 }, y: { step: 0.01 } } })
@@ -200,7 +200,7 @@ export class PixelBreakerParticlesParams
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces", bindingParams: { label: "Enable", type: 'boolean' } })
     public useInterParticleForces : boolean = true;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces", bindingParams: { label: "Particle Radius", min: 1, max: 64, step: 1 } })
-    public interParticleForcesParticleRadius : number = 4;
+    public interParticleForcesParticleRadius : number = 64;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces", bindingParams: { label: "Max Iterations", min: 1, max: 512, step: 1, format: (value: number) => { return value.toFixed(); } } })
     public interParticleForcesMaxIterationCount : number = 256;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces", bindingParams: { label: "Max Neighbor Checks Per Cell", min: 1, max: 256, step: 1, format: (value: number) => { return value.toFixed(); } } })
@@ -229,11 +229,11 @@ export class PixelBreakerParticlesParams
     public cohesionDistanceThreshold : number = 16;
 
     @UIBinding({containerPath: "#T/%Render/@Size", bindingParams: { label: "Render Size Min", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
-    public dynamicParticleSizeMin: number = 1;
+    public dynamicParticleSizeMin: number = 3;
     @UIBinding({containerPath: "#T/%Render/@Size", bindingParams: { label: "Render Size Max", min: 1, max: 32, step:1, format: (value: number) => { return value.toFixed(); } } })
     public dynamicParticleSizeMax: number = 1;
     @UIBinding({containerPath: "#T/%Render/@Size", bindingParams: { label: "Render Size Variance Power" } })
-    public dynamicParticleSizeVariancePower: number = 1;
+    public dynamicParticleSizeVariancePower: number = 1.5;
 
     @UIBinding({containerPath: "#T/%Render/@Trail", bindingParams: { label: "Trail Fade Rate", min: 0.001, max: 1.0, step: 0.001 } })
     public trailFadeRate : number = 0.6;
