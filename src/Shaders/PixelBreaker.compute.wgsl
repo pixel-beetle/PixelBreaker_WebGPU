@@ -180,6 +180,8 @@ struct Uniforms
     
     _ReflectionBoardRectMinMax: vec4<f32>,
     _ReflectionBoardColor: vec4<f32>,
+
+    _ConstanceDirectionalForce: vec4<f32>,
     
     _DistanceFieldCollisionUseHardConstraint: f32,
     _DistanceFieldForceParams: vec4<f32>,
@@ -870,6 +872,11 @@ fn SafeNormalize(v: vec2<f32>) -> vec2<f32>
     return normalize(v);
 }
 
+fn ApplyParticleMotion_ConstanceDirectionalForce(state : ptr<function, ParticleState>, dt: f32)
+{
+    let force = _Uniforms._ConstanceDirectionalForce.xy;
+    (*state).velocity += force * dt;
+}
 
 fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f32, maxSpeed: ptr<function, f32>)
 {
@@ -1148,6 +1155,7 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
         return;
     }
 
+    ApplyParticleMotion_ConstanceDirectionalForce(&particleState, deltaTime);
     var maxSpeed = _Uniforms._DynamicParticleSpeedParams.y;
     ApplyParticleMotion_DistanceField(&particleState, deltaTime, &maxSpeed);
     ApplyParticleMotion_ForceByColor(&particleState, deltaTime);

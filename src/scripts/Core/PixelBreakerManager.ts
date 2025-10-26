@@ -168,6 +168,9 @@ export class PixelBreakerParticlesParams
     public dynamicParticleMaxSpeed: number = 20;
 
 
+    @UIBinding({containerPath: "#T/%Update/#TT/%Force", bindingParams: { label: "Directional Force", x: {  step: 0.01 }, y: { step: 0.01 } } })
+    public constanceDirectionalForce : BABYLON.Vector2 = new BABYLON.Vector2(0, 0);
+
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@SDF Force", bindingParams: { label: "Enable", type: 'boolean' } })
     public useDistanceFieldForce : boolean = true;
 
@@ -270,6 +273,9 @@ export class PixelBreakerParticlesParams
                 break;
             case "colorChangeWhenCollideWithStaticParticle":
                 this.colorChangeWhenCollideWithStaticParticle = value;
+                break;
+            case "constanceDirectionalForce":
+                this.constanceDirectionalForce = value;
                 break;
             case "useDistanceFieldForce":
                 this.useDistanceFieldForce = value;
@@ -800,6 +806,12 @@ export class PixelBreakerManager
             this._staticParticleSpawnRectMax.y,
         );
         this._computeUBO.updateVector4("_StaticParticleSpawnRectMinMax", staticParticleSpawnRectMinMax);
+
+        const constanceDirectionalForce = new BABYLON.Vector4(
+            this.params.constanceDirectionalForce.x * forceScaleFactor, 
+            this.params.constanceDirectionalForce.y * forceScaleFactor, 
+            0, 0);
+        this._computeUBO.updateVector4("_ConstanceDirectionalForce", constanceDirectionalForce);
     }
 
     private UpdateComputeUBO_ReflectionBoardParams()
