@@ -106,6 +106,8 @@ export class MiscGUI
           [Space]  : Play / Pause<br>
           [V]      : Rlay / Pause Video Only<br>
           [R]      : Restart<br>
+          [X]      : Toggle SDF Force<br>
+          [C]      : Toggle Particle Flocking<br>
           [A/D]    : Move Reflection Board<br>
         <br>
         <br>

@@ -299,6 +299,36 @@ export class Application
               )
         );
 
+        // keyboard x to toggle sdf force
+        this._sceneManager.scene.actionManager.registerAction(
+            new BABYLON.ExecuteCodeAction(
+                {
+                  trigger: BABYLON.ActionManager.OnKeyDownTrigger,
+                  parameter: "x",
+                },
+                () => 
+                { 
+                    this._pixelBreakerManager.params.useDistanceFieldForce = !this._pixelBreakerManager.params.useDistanceFieldForce; 
+                    this._inspector.Refresh();
+                }
+              )
+        );
+
+        // keyboard c to toggle inter particle forces
+        this._sceneManager.scene.actionManager.registerAction(
+            new BABYLON.ExecuteCodeAction(
+                {
+                  trigger: BABYLON.ActionManager.OnKeyDownTrigger,
+                  parameter: "c",
+                },
+                () => 
+                { 
+                    this._pixelBreakerManager.params.useInterParticleForces = !this._pixelBreakerManager.params.useInterParticleForces;
+                    this._inspector.Refresh();
+                }
+              )
+        );
+
         // mouse interactions
         this._sceneManager.scene.onPointerObservable.add((pointerInfo) => {
             this._pixelBreakerManager.mouseInteractionParams.UpdateHasWheelAction(

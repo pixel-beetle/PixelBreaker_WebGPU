@@ -217,14 +217,14 @@ export class PixelBreakerParticlesParams
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Alignment", bindingParams: { label: "Enable", type: 'boolean' } })
     public useAlignmentForce : boolean = true;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Alignment", bindingParams: { label: "Strength" } })
-    public alignmentStrength : number = 25;
+    public alignmentStrength : number = 35;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Alignment", bindingParams: { label: "Distance" } })
     public alignmentDistanceThreshold : number = 8;
 
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Cohesion", bindingParams: { label: "Enable", type: 'boolean' } })
     public useCohesionForce : boolean = true;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Cohesion", bindingParams: { label: "Strength" } })
-    public cohesionStrength : number = 12;
+    public cohesionStrength : number = 15;
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@Inter-Particle Forces/@Cohesion", bindingParams: { label: "Distance" } })
     public cohesionDistanceThreshold : number = 16;
 
