@@ -446,7 +446,8 @@ export class Application
                         this._sceneManager.scene, 
                         this._engine, 
                         {width: this._renderTargetWidth, height: this._renderTargetHeight},
-                        this._jumpFloodingSDFGenerator.resultTexture!);
+                        this._jumpFloodingSDFGenerator.resultTexture!,
+                        this._videoManager!.videoTexture!);
             }
 
             this._sceneManager.render(this._pixelBreakerManager.renderMaterial!);

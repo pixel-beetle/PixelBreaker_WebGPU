@@ -184,6 +184,11 @@ export class PixelBreakerParticlesParams
     @UIBinding({containerPath: "#T/%Update/#TT/%Force/@SDF Force", bindingParams: { label: "Swirl Strength(Inside)" } })
     public distanceFieldInsideSwirlStrength : number = 8;
 
+    @UIBinding({containerPath: "#T/%Spawn/@Color", bindingParams: { label: "Video Color Factor On Spawn", min: 0, max: 1, step: 0.01 } })
+    public targetColorFactorOnSpawn : number = 0.0;
+    @UIBinding({containerPath: "#T/%Update/#TT/%Color/@Target Color", bindingParams: { label: "Video Color Factor On Update", min: 0, max: 1, step: 0.01 } })
+    public targetColorFactorOnUpdate : number = 0.0;
+
     @UIBinding({containerPath: "#T/%Update/#TT/%Color/@Force By Color", bindingParams: { label: "Strength" } })
     public forceByColorStrength : number = 8.0;
 
@@ -271,6 +276,12 @@ export class PixelBreakerParticlesParams
                 break;
             case "staticParticleSpawnRectMax01":
                 this.staticParticleSpawnRectMax01 = value;
+                break;
+            case "targetColorFactorOnSpawn":
+                this.targetColorFactorOnSpawn = value;
+                break;
+            case "targetColorFactorOnUpdate":
+                this.targetColorFactorOnUpdate = value;
                 break;
             case "colorChangeWhenCollideWithReflectionBoard":
                 this.colorChangeWhenCollideWithReflectionBoard = value;
@@ -524,6 +535,7 @@ export class PixelBreakerManager
     // Resources
     private _scene: BABYLON.Scene | null = null;
     private _engine: BABYLON.AbstractEngine | null = null;
+    private _targetColorTexture: BABYLON.Texture | null = null;
 
     private _gpuSpatialHashTable: GPUSpatialHashTable | null = null;
     private _computeUBO: UniformBuffer | null = null;
@@ -942,6 +954,14 @@ export class PixelBreakerManager
             0, 
             0);
         this._computeUBO.updateVector4("_ForceByColorParams", forceByColorParams);
+
+        const targetColorParams = new BABYLON.Vector4(
+            this.params.targetColorFactorOnSpawn,
+            this.params.targetColorFactorOnUpdate,
+            0,
+            0
+        );
+        this._computeUBO.updateVector4("_ParticleTargetColorTextureParams", targetColorParams);
     }
 
     private UpdateComputeUBO_SoftwareRasterRender()
@@ -1011,7 +1031,8 @@ export class PixelBreakerManager
     public Tick(scene: BABYLON.Scene, 
                 engine: BABYLON.AbstractEngine,
                 renderTargetSize: BABYLON.ISize,
-                sdfTexture: BABYLON.Texture | null) : void
+                sdfTexture: BABYLON.Texture | null,
+                targetColorTexture: BABYLON.Texture | null) : void
     {
         if (!this.InitializeIfNeeded(scene, engine, renderTargetSize))
         {
@@ -1020,6 +1041,7 @@ export class PixelBreakerManager
         }
 
         this._time += this._scene!.deltaTime;
+        this._targetColorTexture = targetColorTexture;
         this.UpdateComputeUBO();
 
         if (!this._isInitialiSpawnDone)
@@ -1098,6 +1120,7 @@ export class PixelBreakerManager
         
         kInitialSpawnParticles!.cs!.setTexture("_ParticleSpawnColorGradientTexture", this.particleSpawnColorGradientTexture!.texture!, false);
         kInitialSpawnParticles!.cs!.setTextureSampler("_sampler_bilinear_clamp", this._sharedTextureSamplerCollection!.BilinearClamp);
+        kInitialSpawnParticles!.cs!.setTexture("_ParticleTargetColorTexture", this._targetColorTexture!, false);
 
         const workGroupSizeX = kInitialSpawnParticles!.workgroupSizeX;
         const canSpawn = kInitialSpawnParticles!.cs!.dispatch((totalSpawnCount + workGroupSizeX - 1) / workGroupSizeX, 1, 1);
@@ -1201,6 +1224,7 @@ export class PixelBreakerManager
         
         kUpdateDynamicParticles!.cs!.setTexture("_DistanceFieldTexture", sdfTexture!, false);
         kUpdateDynamicParticles!.cs!.setTextureSampler("_sampler_bilinear_clamp", this._sharedTextureSamplerCollection!.BilinearClamp);
+        kUpdateDynamicParticles!.cs!.setTexture("_ParticleTargetColorTexture", this._targetColorTexture!, false);
 
         kUpdateDynamicParticles!.cs!.dispatchIndirect(this._indirectDispatchArgsBuffer!.storageBuffer, 0 * this._UINT_BYTE_SIZE);
     }

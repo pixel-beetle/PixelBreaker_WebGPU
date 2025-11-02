@@ -219,6 +219,10 @@ struct Uniforms
     // y: strength
     // z: distance
     _InterParticleForceParams_Cohesion: vec4<f32>,
+
+    // x: spawn color factor
+    // y: dynamic particle color factor
+    _ParticleTargetColorTextureParams: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> _Uniforms: Uniforms;
@@ -253,6 +257,7 @@ struct Uniforms
 @group(1) @binding(1) var _DistanceFieldTexture: texture_2d<f32>;
 @group(1) @binding(2) var _ParticleSpawnColorGradientTexture: texture_2d<f32>;
 @group(1) @binding(3) var _ParticleColorBySpeedGradientTexture: texture_2d<f32>;
+@group(1) @binding(4) var _ParticleTargetColorTexture: texture_2d<f32>;
 
 
 
@@ -505,6 +510,18 @@ fn RandomDirection(hash: u32) -> vec2<f32>
     return SafeNormalize(UnpackColor(Hash(hash)).rg * 2.0 - 1.0);
 }
 
+fn ApplyParticleTargetColor(state : ptr<function, ParticleState>, factor : f32)
+{
+    if (factor < 1e-6)
+    {
+        return;
+    }
+
+    let uv = saturate(state.position.xy / _Uniforms._RenderTargetTexelSize.zw);
+    let targetColor = textureSampleLevel(_ParticleTargetColorTexture, _sampler_bilinear_clamp, uv, 0.0);
+    state.color = mix(state.color, vec4<f32>(targetColor.rgb, 1.0), factor);
+}
+
 @compute @workgroup_size(THREAD_GROUP_SIZE_X, 1, 1)
 fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
 {
@@ -549,7 +566,11 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
                              tintedColorRGB, 
                              saturate(_Uniforms._ParticleColorTint.a));
 
-        particleState.color = vec4<f32>(tintedColorRGB, particleStableRandom);        particleActivateState = PARTICLE_ACTIVATE_STATE_STATIC;
+        particleState.color = vec4<f32>(tintedColorRGB, particleStableRandom);
+        let targetColorFactor = _Uniforms._ParticleTargetColorTextureParams.x;
+        ApplyParticleTargetColor(&particleState, targetColorFactor);
+
+        particleActivateState = PARTICLE_ACTIVATE_STATE_STATIC;
         var indexInActiveParticleSlotIndexBuffer = IncrementStaticParticleCount();
         _ActiveStaticParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
         WriteParticleState(particleSlotID, particleState);
@@ -582,6 +603,9 @@ fn InitialSpawnParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
                              saturate(_Uniforms._ParticleColorTint.a));
 
         particleState.color = vec4<f32>(tintedColorRGB, particleStableRandom);
+        let targetColorFactor = _Uniforms._ParticleTargetColorTextureParams.x;
+        ApplyParticleTargetColor(&particleState, targetColorFactor);
+
         particleActivateState = PARTICLE_ACTIVATE_STATE_DYNAMIC;
         var indexInActiveParticleSlotIndexBuffer = IncrementDynamicParticleCount();
         _ActiveDynamicParticleSlotIndexBuffer_RW[indexInActiveParticleSlotIndexBuffer] = particleSlotID;
@@ -904,8 +928,6 @@ fn ApplyParticleMotion_DistanceField(state : ptr<function, ParticleState>, dt: f
         
         let swirlStrength = _Uniforms._DistanceFieldForceParams.w;
         (*state).velocity += dfTangent * swirlStrength * dt;
-        
-        // *maxSpeed = min(*maxSpeed * mix(1.5, 3.5, pow(df, 0.3)), 8000.0);
 
         let kMaxPushIterationCount = u32(128 * _Uniforms._DistanceFieldCollisionUseHardConstraint);
         var pushIterationCount = 0u;
@@ -1155,6 +1177,8 @@ fn UpdateDynamicParticles(@builtin(global_invocation_id) globalId: vec3<u32>)
         return;
     }
 
+    let targetColorFactor = _Uniforms._ParticleTargetColorTextureParams.y;
+    ApplyParticleTargetColor(&particleState, targetColorFactor);
     ApplyParticleMotion_ConstanceDirectionalForce(&particleState, deltaTime);
     var maxSpeed = _Uniforms._DynamicParticleSpeedParams.y;
     ApplyParticleMotion_DistanceField(&particleState, deltaTime, &maxSpeed);
