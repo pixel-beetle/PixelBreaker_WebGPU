@@ -388,7 +388,7 @@ export class Application
         const currentPathParts = currentPath.split('/');
         const currentFilename = currentPathParts[currentPathParts.length - 1];
         
-        this._currentResourcePosterPath = './BadApple_Poster.png';
+        this._currentResourcePosterPath = './BadApple_Poster.webp';
         this._currentResourceVideoPath = './BadApple_Video.mp4';
 
         if (resourcesData[currentFilename])

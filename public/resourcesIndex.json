@@ -1,7 +1,7 @@
 {
     "BadApple":
     {
-        "poster": "./BadApple_Poster.png",
+        "poster": "./BadApple_Poster.webp",
         "video": "./BadApple_Video.mp4"
     }
 }
