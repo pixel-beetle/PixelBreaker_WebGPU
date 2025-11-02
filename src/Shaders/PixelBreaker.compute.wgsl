@@ -3,6 +3,12 @@ const kPositionCoordMax = 8192.0;
 const kSpeedMin = -8192.0;
 const kSpeedMax = 8192.0;
 
+fn Luminance(sample: vec4<f32>) -> f32
+{
+    return dot(sample.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
+}
+
+
 fn PackParticlePosition(positionCoord: vec2<f32>) -> u32
 {
     // 16 bit each
@@ -191,6 +197,7 @@ struct Uniforms
     _ColorBySpeedParams: vec4<f32>, // xy:remap range, w:enable
 
     _TrailFadeRate: f32,
+    _EnableContinuousTrail: f32,
     _SoftwareRasterizeSortingParams: vec4<f32>,
 
     _MousePosition: vec4<f32>, // xy: pos, z:is pressed, w: button
@@ -222,6 +229,7 @@ struct Uniforms
 
     // x: spawn color factor
     // y: dynamic particle color factor
+    // z: target color luminance threshold
     _ParticleTargetColorTextureParams: vec4<f32>,
 }
 
@@ -516,9 +524,16 @@ fn ApplyParticleTargetColor(state : ptr<function, ParticleState>, factor : f32)
     {
         return;
     }
-
+    
     let uv = saturate(state.position.xy / _Uniforms._RenderTargetTexelSize.zw);
     let targetColor = textureSampleLevel(_ParticleTargetColorTexture, _sampler_bilinear_clamp, uv, 0.0);
+    let targetColorLuminance = Luminance(targetColor);
+    let targetColorLuminanceThreshold = _Uniforms._ParticleTargetColorTextureParams.z;
+    if (targetColorLuminance < targetColorLuminanceThreshold)
+    {
+        return;
+    }
+
     state.color = mix(state.color, vec4<f32>(targetColor.rgb, 1.0), factor);
 }
 

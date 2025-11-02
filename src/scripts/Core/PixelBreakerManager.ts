@@ -186,6 +186,8 @@ export class PixelBreakerParticlesParams
 
     @UIBinding({containerPath: "#T/%Spawn/@Color", bindingParams: { label: "Video Color Factor On Spawn", min: 0, max: 1, step: 0.01 } })
     public targetColorFactorOnSpawn : number = 0.0;
+    @UIBinding({containerPath: "#T/%Spawn/@Color", bindingParams: { label: "Target Color Luminance Threshold", min: 0, max: 1, step: 0.01 } })
+    public targetColorLuminanceThreshold : number = 0.001;
     @UIBinding({containerPath: "#T/%Update/#TT/%Color/@Target Color", bindingParams: { label: "Video Color Factor On Update", min: 0, max: 1, step: 0.01 } })
     public targetColorFactorOnUpdate : number = 0.0;
 
@@ -958,7 +960,7 @@ export class PixelBreakerManager
         const targetColorParams = new BABYLON.Vector4(
             this.params.targetColorFactorOnSpawn,
             this.params.targetColorFactorOnUpdate,
-            0,
+            this.params.targetColorLuminanceThreshold,
             0
         );
         this._computeUBO.updateVector4("_ParticleTargetColorTextureParams", targetColorParams);
