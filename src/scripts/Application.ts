@@ -58,6 +58,11 @@ export class Application
     private _fpsGraph: any = null;
     private _playStateText : any = null;
 
+
+    private _currentResourceData: any = null;
+    private _currentResourcePosterPath: string = '';
+    private _currentResourceVideoPath: string = '';
+
     constructor(readonly canvas: HTMLCanvasElement) {
         this._engine = new BABYLON.WebGPUEngine(canvas) as any;
         window.addEventListener('resize', () => {
@@ -87,7 +92,7 @@ export class Application
             view: 'separator',
         });
 
-        this._videoManager.SetupVideo('./BadApple_Video.mp4');
+        this._videoManager.SetupVideo(this._currentResourceVideoPath);
         const videoParentNode = this._inspector.pane.element;
         videoParentNode.appendChild(this._videoManager.videoElement!);
 
@@ -374,9 +379,32 @@ export class Application
 
     async Run(): Promise<void> 
     {
+        const resources = await fetch('./resourcesIndex.json');
+        const resourcesData = await resources.json();
+        console.log(resourcesData);
+
+        // get current path
+        const currentPath = window.location.pathname;
+        const currentPathParts = currentPath.split('/');
+        const currentFilename = currentPathParts[currentPathParts.length - 1];
+        
+        this._currentResourcePosterPath = './BadApple_Poster.png';
+        this._currentResourceVideoPath = './BadApple_Video.mp4';
+
+        if (resourcesData[currentFilename])
+        {
+            const resourceData = resourcesData[currentFilename];
+            if (resourceData.poster && resourceData.poster !== ''
+                && resourceData.video && resourceData.video !== '')
+            {
+                this._currentResourcePosterPath = resourceData.poster;
+                this._currentResourceVideoPath = resourceData.video;
+            }
+        }
+
         const webGPUSupport = await BABYLON.WebGPUEngine.IsSupportedAsync;
         this._miscGUI = new MiscGUI();
-        this._miscGUI.CreateFirstScreenElements(webGPUSupport, this);
+        this._miscGUI.CreateFirstScreenElements(webGPUSupport, this, this._currentResourcePosterPath);
 
         if ((this._engine as any).initAsync) {
             await (this._engine as any).initAsync();

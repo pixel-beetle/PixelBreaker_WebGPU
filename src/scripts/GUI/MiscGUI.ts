@@ -33,7 +33,7 @@ export class MiscGUI
         return posterElement;
     }
 
-    private CreatePosterElement(): HTMLElement
+    private CreatePosterElement(posterPath: string): HTMLElement
     {
         const containerElement = document.createElement('div');
         containerElement.style.position = 'absolute';
@@ -65,7 +65,7 @@ export class MiscGUI
         imageElement.style.left = '0';
         imageElement.style.width = '100%';
         imageElement.style.height = '100%';
-        imageElement.src = './poster.png';
+        imageElement.src = posterPath;
         imageElement.alt = 'poster';
 
         imageElement.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
@@ -121,7 +121,10 @@ export class MiscGUI
     }
 
 
-    public CreateFirstScreenElements(isWebGPUSupported: boolean, application: Application): void 
+    public CreateFirstScreenElements(isWebGPUSupported: boolean, 
+        application: Application,
+        posterPath: string
+    ): void 
     {
         if (!isWebGPUSupported)
         {
@@ -134,7 +137,7 @@ export class MiscGUI
         else
         {
             // ask for first interaction
-            this._posterElement = this.CreatePosterElement();
+            this._posterElement = this.CreatePosterElement(posterPath);
             document.body.style.backgroundColor = 'black';
             document.body.appendChild(this._posterElement);
             this._posterElement.addEventListener('click', () => {
